@@ -154,7 +154,7 @@ describe("createAuthedUploader", () => {
     fetchSpy.mockResolvedValueOnce(Response.json({ error: "unauthorized" }, { status: 401 }));
     const up = await createAuthedUploader({ flagHost: BASE, store: { filePath: file } });
     await expect(up.upload("{}")).rejects.toThrow(
-      "Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Check that it matches the dashboard's upload token.",
+      "Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.",
     );
     expect(fetchSpy.mock.calls.map(([, init]) => init?.method)).toEqual(phase === "polling" ? ["POST", "GET"] : ["POST"]);
   });

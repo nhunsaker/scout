@@ -27,7 +27,7 @@ export class HostUnavailableError extends Error {
 /** The dashboard rejected `SCOUTUI_TOKEN`. */
 export class TokenRejectedError extends Error {
   constructor() {
-    super("Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Check that it matches the dashboard's upload token.");
+    super("Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.");
   }
 }
 
