@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      coverage-report: ${{ steps.merge-coverage.outputs.report }}
 
     # The database suites run against this Postgres; without it they skip.
     services:
@@ -60,8 +62,11 @@ jobs:
       # IDEs use locally). nyc merge combines them because nyc report can only
       # read from a single directory, then nyc report's own Cobertura reporter -
       # the same tool, just pointed at the combined data - produces one repo-wide
-      # report for the upload below.
+      # report for the upload below. It sets the report output once that report
+      # exists; when no affected package wrote coverage, the output stays unset
+      # and the upload below and upload-coverage-typescript are skipped.
       - name: Merge coverage reports
+        id: merge-coverage
         shell: bash
         run: |
           mkdir -p .nyc_output_raw .nyc_output
@@ -76,8 +81,11 @@ jobs:
           fi
           node_modules/.bin/nyc merge .nyc_output_raw .nyc_output/out.json
           node_modules/.bin/nyc report --reporter cobertura --report-dir coverage --temp-dir .nyc_output --cwd "$PWD"
+          if [ -f coverage/cobertura-coverage.xml ]; then
+            echo "report=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Upload coverage artifact
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: steps.merge-coverage.outputs.report == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: coverage-report-typescript
@@ -90,7 +98,7 @@ jobs:
   # dependencies that shouldn't hold that permission.
   upload-coverage-typescript:
     needs: lint-test-build
-    if: ${{ !cancelled() && needs.lint-test-build.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ !cancelled() && needs.lint-test-build.result == 'success' && needs.lint-test-build.outputs.coverage-report == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,11 +108,13 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.0
         with:
           name: coverage-report-typescript
+      # Uploads without waiting for GitHub to finish processing the report.
       - uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
         with:
           file: cobertura-coverage.xml
           language: TypeScript
           label: code-coverage-agent
+          wait-for-processing-timeout: 0
 
   # Runs the chart's helm-unittest suites.
   chart-test:
