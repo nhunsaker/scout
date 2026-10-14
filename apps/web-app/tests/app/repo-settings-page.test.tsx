@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RepoSettingsPage from "@/app/repos/[repoId]/settings/page";
 
@@ -16,6 +16,9 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`);
+  }),
 }));
 vi.mock("@/app/repos/repo-actions", () => ({ createToken: vi.fn(), regenerateToken: vi.fn(), revokeToken: vi.fn(), deleteRepo: vi.fn() }));
 
@@ -26,11 +29,11 @@ afterEach(() => {
 });
 
 describe("RepoSettingsPage", () => {
-  it("turns a Viewer away without reading the repo's settings", async () => {
+  it("sends a Viewer to the repo page without reading the repo's settings", async () => {
     identity.role = "viewer";
-    render(await page());
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Only Editors can see a repo's settings. Ask an Admin for access.");
+    await expect(page()).rejects.toThrow("NEXT_REDIRECT /repos/payloadcms%2Fpayload");
+    expect(redirect).toHaveBeenCalledExactlyOnceWith("/repos/payloadcms%2Fpayload");
     expect(repoSettings).not.toHaveBeenCalled();
   });
 

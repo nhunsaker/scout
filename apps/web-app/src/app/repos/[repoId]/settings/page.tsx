@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { DeleteRepoSection, UploadTokenSection } from "@/components/repos/repo-settings";
-import { EmptyState } from "@/components/ui/empty-state";
 import { getPool } from "@/db/client";
 import { can } from "@/lib/access";
 import { formatAbsoluteUtc } from "@/lib/format-absolute";
@@ -19,9 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ repoId: s
 export default async function RepoSettingsPage({ params }: { params: Promise<{ repoId: string }> }) {
   const repoId = decodeURIComponent((await params).repoId);
   const identity = await identify({ browser: true });
-  if (!can(identity, "upload", { repoId })) {
-    return <EmptyState titleAs="h1" title="Only Editors can see a repo's settings. Ask an Admin for access." />;
-  }
+  if (!can(identity, "upload", { repoId })) redirect(`/repos/${encodeURIComponent(repoId)}`);
   const settings = await repoSettings(getPool(), repoId);
   if (!settings) notFound();
   const { token } = settings;
