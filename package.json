@@ -31,6 +31,7 @@
     "typescript": "5.9.3"
   },
   "resolutions": {
+    "@docusaurus/core/tinypool": "^2.1.2",
     "@esbuild-kit/core-utils/esbuild": "0.25.12",
     "next/postcss": "8.5.28",
     "serialize-javascript": "^7.0.5",
