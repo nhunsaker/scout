@@ -124,20 +124,6 @@ npx scout scan --host https://scout.example.com
 
 The upload ends with `Uploaded the scan of <commit>: https://scout.example.com/repos/storefront`, and the repo appears on the repos list. If it stops with `Error: You can view this dashboard but not upload to it. Ask an Admin to make you an Editor.`, the dashboard didn't make you an Admin: see [If someone you named isn't an Admin](/docs/guides/manage-people-and-roles#if-someone-you-named-isnt-an-admin).
 
-## Let CI upload
-
-For CI jobs that upload without anyone signing in, add a `SCOUTUI_CI_UPLOAD_TOKEN` key to the Secret and restart the web server so it reads it:
-
-```bash
-token=$(openssl rand -hex 32)
-kubectl patch secret scout-secret \
-  -p "{\"stringData\":{\"SCOUTUI_CI_UPLOAD_TOKEN\":\"$token\"}}"
-kubectl rollout restart deploy/scout
-echo "$token"
-```
-
-Store the printed token as a secret in your CI system. [Run a scan and upload in CI](/docs/guides/run-in-ci) covers the rest.
-
 ## Upgrade
 
 Upgrade the dashboard before your teams upgrade the CLI ([Upgrade Scout](/docs/guides/upgrade-scout)).
@@ -292,7 +278,7 @@ To let in only your own email domains, set `auth.oidc.allowedDomains` to them, s
 
 ### Check client addresses behind a proxy
 
-CLI sign-in and CI uploads are rate limited per client address. The dashboard reads that address from the `X-Forwarded-For` header, which proxies in front of it add to. If it reads the wrong entry, every caller may share one limit, or a caller can choose their own address to get around it.
+CLI sign-in is rate limited per client address. The dashboard reads that address from the `X-Forwarded-For` header, which proxies in front of it add to. If it reads the wrong entry, every caller may share one limit, or a caller can choose their own address to get around it.
 
 1. Count the proxies in front of the dashboard that add an address to `X-Forwarded-For`. The default, 1, fits an ingress controller that adds the address it saw. With only an ingress controller in front of the dashboard, the default is right: skip to step 2 to check it.
    - A CDN or tunnel in front of the ingress, such as Cloudflare, adds one.

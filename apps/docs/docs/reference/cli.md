@@ -219,7 +219,7 @@ A host without a scheme gets `https://`. A host must use `https://`; plain `http
 | `SCOUTUI_HOST` | Host for uploads and `auth`. Its place in the order is under [Host resolution](#host-resolution). |
 | `SCOUTUI_DEBUG` | Any value other than empty or `0` works like [`--debug`](#global-flags). |
 | `SCOUTUI_NO_UPDATE_CHECK` | Any value other than empty or `0` turns off the [check for a newer version](#new-versions). |
-| `SCOUTUI_TOKEN` | When set and not empty, `scan` and `backfill` upload with this token instead of your saved session. It must match the dashboard's `SCOUTUI_CI_UPLOAD_TOKEN`. Used by CI; see [Run a scan and upload in CI](/docs/guides/run-in-ci). |
+| `SCOUTUI_TOKEN` | When set and not empty, `scan` and `backfill` upload with this token instead of your saved session. It's a repo's CI upload token, from the repo's Settings page on the dashboard, and uploads scans of that repo only. Used by CI; see [Run a scan and upload in CI](/docs/guides/run-in-ci). |
 
 Rarely needed:
 

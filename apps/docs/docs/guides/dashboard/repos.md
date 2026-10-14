@@ -110,7 +110,7 @@ If a page shows **Preparing scan data** instead of its content, the dashboard is
 [Admins](/docs/guides/manage-people-and-roles) can remove a scan that shouldn't count, such as a test run or a scan of the wrong branch, and delete a repo.
 
 - **Remove a scan.** On the repo's **Scan history**, press **⋯** at the end of the scan's row, select **Remove scan**, then press **Remove**. If it was the latest scan, the scan before it becomes the latest. This can't be undone. On a repo's only scan the menu offers **Delete repo…** instead.
-- **Delete a repo.** On the repo page, press **⋯** beside the repo's name and select **Delete repo…**. Type the repo's id, then press **Delete repo**. The repo and all its scans are deleted, and the repos list opens. The repo comes back the next time a scan of it is uploaded.
+- **Delete a repo.** On the repo page, press **⋯**, then **Settings**, then **Delete repo…** under **Delete repo**. Type the repo's id, then press **Delete repo**. The repo and all its scans are deleted, and the repos list opens. The repo comes back the next time someone uploads a scan of it. Its CI upload token is deleted too: to upload from CI again, [create a new one](/docs/guides/run-in-ci#1-create-the-repos-ci-upload-token).
 
 Charts leave out what you removed, earlier points included. A saved chart about a deleted repo stays, and its scope reads **storefront · missing**. **History** on the **Settings** page records who removed or deleted what.
 
