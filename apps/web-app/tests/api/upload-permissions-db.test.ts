@@ -230,7 +230,7 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     expect((await pool.query("SELECT state FROM scan_uploads WHERE upload_id = $1", [uploadId])).rows[0].state).toBe("ready");
   });
 
-  it("no longer takes uploads with SCOUTUI_CI_UPLOAD_TOKEN", async () => {
+  it("refuses an upload bearing SCOUTUI_CI_UPLOAD_TOKEN's value", async () => {
     vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", "ci-secret-1234");
     expect((await upload(post("/api/scans", "ci-secret-1234", "{}"))).status).toBe(401);
   });

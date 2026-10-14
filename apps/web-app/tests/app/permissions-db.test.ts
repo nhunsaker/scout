@@ -238,13 +238,16 @@ describe.skipIf(!RUN_DB)("edit actions against PostgreSQL", () => {
       expect(await tokens()).toEqual(made);
     });
 
-    it("refuses a second create while the repo has a token and keeps the first, and refuses a regenerate once it's revoked", async () => {
+    it("refuses a second create while the repo has a token and keeps the first, regenerates it, and refuses a regenerate once it's revoked", async () => {
       signInAs(editor);
       const first = await createToken("repo-a");
       const made = await tokens();
       expect(await createToken("repo-a")).toEqual({ ok: false, error: TOKEN_CHANGED });
       expect(await tokens()).toEqual(made);
       expect(first.ok).toBe(true);
+      const regenerated = await regenerateToken("repo-a");
+      expect(regenerated).toMatchObject({ ok: true, token: expect.stringMatching(/^scout_r_/) });
+      expect((await tokens())[0].token_hash).not.toBe(made[0].token_hash);
       expect(await revokeToken("repo-a")).toEqual({ ok: true });
       expect(await regenerateToken("repo-a")).toEqual({ ok: false, error: TOKEN_CHANGED });
       expect(await tokens()).toEqual([]);

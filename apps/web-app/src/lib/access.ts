@@ -32,7 +32,7 @@ const NEEDS: Record<Exclude<Action, "view">, Role> = { edit: "editor", upload: "
  */
 export function can(identity: Identity | null, action: Action, target?: Target): boolean {
   if (identity === null) return false;
-  if (identity.kind === "repo-token") return action === "upload";
+  if (identity.kind === "repo-token") return action === "upload" && !(target && "repoId" in target && target.repoId !== identity.repoId);
   const chart = target && "chart" in target ? target.chart : null;
   const ownsOrAdmin = chart === null || chart.createdByUserId === identity.userId || identity.role === "admin";
   if (action === "view") return chart?.visibility === "everyone" || ownsOrAdmin;

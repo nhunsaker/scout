@@ -48,15 +48,18 @@ describe("UploadTokenSection", () => {
   it.each([
     { clipboard: "blocked", stub: () => writeText.mockRejectedValue(new Error("Write permission denied.")) },
     { clipboard: "missing", stub: () => Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }) },
-  ])("says when the token couldn't be copied, with the clipboard $clipboard", async ({ stub }) => {
+  ])("says when the token couldn't be copied after a copy that worked, with the clipboard $clipboard", async ({ stub }) => {
     actions.createToken.mockResolvedValue({ ok: true, token: TOKEN });
-    stub();
     render(<UploadTokenSection repoId={REPO} created={null} />);
     fireEvent.click(screen.getByRole("button", { name: "Create token" }));
     fireEvent.click(await screen.findByRole("button", { name: "Copy" }));
+    const copied = await screen.findByRole("button", { name: "Copied" });
+    stub();
+    fireEvent.click(copied);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy the token. Select it and copy it instead.");
     expect(screen.queryByRole("button", { name: "Copied" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   });
 
   it("asks before regenerating in the token's row, and shows the new token once confirmed", async () => {

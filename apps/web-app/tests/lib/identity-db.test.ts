@@ -246,4 +246,13 @@ describe("can", () => {
   it.each(chartRows)("$who may $action $chart: $allowed", ({ identity, action, target, allowed }) => {
     expect(can(identity, action, { chart: target })).toBe(allowed);
   });
+
+  const repoRows: { who: string; identity: Identity; action: Action; repo: string; target: { repoId: string }; allowed: boolean }[] = [
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "upload", repo: "scans of its own repo", target: { repoId: "repo-a" }, allowed: true },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "upload", repo: "scans of another repo", target: { repoId: "repo-b" }, allowed: false },
+  ];
+
+  it.each(repoRows)("$who may $action $repo: $allowed", ({ identity, action, target, allowed }) => {
+    expect(can(identity, action, target)).toBe(allowed);
+  });
 });

@@ -92,6 +92,7 @@ export function UploadTokenSection({ repoId, created }: { repoId: string; create
       await navigator.clipboard.writeText(value);
       setCopied(true);
     } catch {
+      setCopied(false);
       setError(COPY_FAILED);
     }
   };
