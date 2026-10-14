@@ -5,7 +5,7 @@ import type { Refusal } from "./scan-acceptance.ts";
 
 const REPO_UPLOAD_TOKEN_PATTERN = /^scout_r_[A-Za-z0-9_-]{43}$/;
 
-export type UploadTokenInfo = { createdAt: string; createdByEmail: string };
+export type UploadTokenInfo = { createdAt: string; createdByEmail: string | null };
 export type TokenResult = { ok: true; token: string } | { ok: false; error: string };
 
 export const TOKEN_CHANGED = "The token has changed since the page loaded. Reload to see it.";
@@ -24,7 +24,7 @@ export async function repoSettings(pool: Pool, repoId: string): Promise<{ scanCo
     `SELECT (SELECT count(*)::int FROM scans WHERE scans.repo_id = repos.repo_id) AS scan_count, token.created_at, token.created_by_email
      FROM repos LEFT JOIN repo_upload_tokens AS token USING (repo_id) WHERE repos.repo_id = $1`, [repoId]);
   if (!row) return null;
-  const token = row.created_at && row.created_by_email ? { createdAt: row.created_at.toISOString(), createdByEmail: row.created_by_email } : null;
+  const token = row.created_at ? { createdAt: row.created_at.toISOString(), createdByEmail: row.created_by_email || null } : null;
   return { scanCount: row.scan_count, token };
 }
 

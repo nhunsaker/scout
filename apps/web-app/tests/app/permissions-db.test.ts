@@ -5,6 +5,7 @@ import { deleteDashboard, saveDashboard, setDashboardVisibility } from "@/app/ch
 import { deleteGovernance, saveGovernance } from "@/app/governance/governance-actions";
 import { deleteTag, quickTagPackage, saveTag } from "@/app/packages/tag-actions";
 import { createToken, regenerateToken, revokeToken } from "@/app/repos/repo-actions";
+import { removeFromPeople } from "@/app/settings/people-actions";
 import { getPool } from "@/db/client";
 import { CHART_REFUSAL, EDIT_REFUSAL } from "@/lib/access";
 import { repoSettings, TOKEN_CHANGED } from "@/lib/repo-upload-tokens";
@@ -250,6 +251,25 @@ describe.skipIf(!RUN_DB)("edit actions against PostgreSQL", () => {
       expect((await tokens())[0].token_hash).not.toBe(made[0].token_hash);
       expect(await revokeToken("repo-a")).toEqual({ ok: true });
       expect(await regenerateToken("repo-a")).toEqual({ ok: false, error: TOKEN_CHANGED });
+      expect(await tokens()).toEqual([]);
+    });
+
+    it("reports a token whose creator email is empty, with the creator email null", async () => {
+      signInAs(editor);
+      await createToken("repo-a");
+      await pool.query("UPDATE repo_upload_tokens SET created_by_email = ''");
+      expect(await repoSettings(pool, "repo-a")).toEqual({ scanCount: 0, token: { createdAt: expect.any(String), createdByEmail: null } });
+    });
+
+    it("keeps a token and its creator's email once the creator is removed from People, and lets an Admin regenerate and revoke it", async () => {
+      const admin = await insertPerson(pool, { email: "di@example.com", role: "admin" });
+      signInAs(editor);
+      await createToken("repo-a");
+      signInAs(admin);
+      expect(await removeFromPeople(editor)).toEqual({ ok: true });
+      expect(await repoSettings(pool, "repo-a")).toEqual({ scanCount: 0, token: { createdAt: expect.any(String), createdByEmail: "bo@example.com" } });
+      expect(await regenerateToken("repo-a")).toMatchObject({ ok: true, token: expect.stringMatching(/^scout_r_/) });
+      expect(await revokeToken("repo-a")).toEqual({ ok: true });
       expect(await tokens()).toEqual([]);
     });
   });

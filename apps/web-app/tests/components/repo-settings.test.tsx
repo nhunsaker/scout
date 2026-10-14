@@ -89,6 +89,12 @@ describe("UploadTokenSection", () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copy" })));
   });
 
+  it("says only when the token was created when its creator has no email", () => {
+    render(<UploadTokenSection repoId={REPO} created={{ ...CREATED, by: null }} />);
+    expect(screen.getByText(/^Created/).textContent).toBe("Created 3 days ago");
+    expect(screen.getByText("3 days ago")).toHaveAttribute("title", "2026-10-11 09:12 UTC");
+  });
+
   it("asks before revoking in the token's row, then moves focus to Create token", async () => {
     actions.revokeToken.mockResolvedValue({ ok: true });
     const { rerender } = render(<UploadTokenSection repoId={REPO} created={CREATED} />);

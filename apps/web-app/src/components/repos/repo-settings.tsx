@@ -7,8 +7,8 @@ import { actionErrorMessage } from "@/lib/action-error";
 import type { TokenResult } from "@/lib/repo-upload-tokens";
 import { DeleteRepoDialog } from "./delete-repo-dialog";
 
-/** When the repo's CI upload token was created, relative (`when`) and absolute (`at`), and by whom. */
-export type TokenCreated = { when: string; at: string; by: string };
+/** When the repo's CI upload token was created, relative (`when`) and absolute (`at`), and by whom, or null when no one is recorded. */
+export type TokenCreated = { when: string; at: string; by: string | null };
 
 const ROW = "flex flex-wrap items-center justify-between gap-x-6 gap-y-3";
 const ROW_TEXT = "min-w-0 flex-[1_1_15rem] text-sm";
@@ -136,7 +136,7 @@ export function UploadTokenSection({ repoId, created }: { repoId: string; create
           <p id={promptId} className={ROW_TEXT}>
             {asking === "regenerate" ? "Regenerate the token? The current one stops working at once."
               : asking === "revoke" ? "Revoke the token? CI can't upload scans of this repo until someone creates a new one."
-              : <>Created <span title={created.at}>{created.when}</span> by <span className="wrap-anywhere">{created.by}</span></>}
+              : <>Created <span title={created.at}>{created.when}</span>{created.by === null ? null : <> by <span className="wrap-anywhere">{created.by}</span></>}</>}
           </p>
           <div className={ACTIONS}>
             {asking !== "revoke" ? (
