@@ -18,6 +18,14 @@ describe("TARGETS", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
+  test("every scan names its own token secret", () => {
+    const scans = TARGETS.flatMap((t) => t.scans);
+    for (const s of scans) {
+      expect(s.tokenSecret, `${s.repoId} tokenSecret`).toMatch(/^SCOUTUI_TOKEN_[A-Z0-9_]+$/);
+    }
+    expect(new Set(scans.map((s) => s.tokenSecret)).size).toBe(scans.length);
+  });
+
   test("every scan has a non-empty include", () => {
     for (const t of TARGETS) {
       for (const s of t.scans) {

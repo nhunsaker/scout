@@ -74,7 +74,7 @@ export default async function RepoDetailPage({
       {showOlderScanBanner ? (
         <ViewingOlderScanBanner repoId={repoId} committedAt={detail.committedAt} arrivedAt={detail.arrivedAt} />
       ) : null}
-      <RepoDetailHeader detail={detail} recentScans={recentScans} canManage={can(identity, "manage-repos", { repoId })} />
+      <RepoDetailHeader detail={detail} recentScans={recentScans} canOpenSettings={can(identity, "upload", { repoId })} />
       <ScanFindings findings={detail.findings} />
       <SkippedScansNotice fallbacks={page.fallbacks} ownPage />
       <RepoTabs

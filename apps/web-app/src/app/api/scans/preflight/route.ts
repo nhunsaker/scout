@@ -5,8 +5,9 @@ import { can, UPLOAD_REFUSAL } from "@/lib/access";
 import { builtWithCli } from "@/lib/built-with-cli";
 import { dashboardWarning } from "@/lib/dashboard-warning";
 import { identify } from "@/lib/identity";
-import { rateLimit, clientKey, logRateLimitRejection } from "@/lib/rate-limit";
+import { rateLimit, logRateLimitRejection } from "@/lib/rate-limit";
 import { repoIdentityRefusal } from "@/lib/repo-identity";
+import { uploadTokenRefusal } from "@/lib/repo-upload-tokens";
 import { readJsonBody } from "@/lib/request-body";
 import { acceptScan, commitDecision, SCAN_FORMATS, storedScans } from "@/lib/scan-acceptance";
 import { errorClass, repoScanUrl } from "@/lib/scan-jobs";
@@ -46,7 +47,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ refusal: UPLOAD_REFUSAL, commits: [], warning: dashboardWarning(), scanFormats: SCAN_FORMATS });
   }
 
-  const key = identity.kind === "ci" ? `preflight:ci:${clientKey(req)}` : `preflight:user:${identity.userId}`;
+  const key = identity.kind === "repo-token" ? `preflight:repo:${identity.repoId}` : `preflight:user:${identity.userId}`;
   const limited = rateLimit(key, PREFLIGHT_LIMIT, PREFLIGHT_WINDOW_MS);
   if (!limited.ok) {
     logRateLimitRejection("preflight", key);
@@ -66,6 +67,9 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const pool = getPool();
+    if (identity.kind === "repo-token" && await uploadTokenRefusal(pool, { tokenRepoId: identity.repoId, repoId: scan.repoId })) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     const refusal = acceptScan({ schemaVersion: scan.schemaVersion, scannerName: scan.scanner }, { matchingCli: { version: builtWithCli, command: "scan" } })
       ?? await repoIdentityRefusal(pool, { repoId: scan.repoId, remote: scan.remote });
     if (refusal) return NextResponse.json({ refusal, commits: [], warning: dashboardWarning(), scanFormats: SCAN_FORMATS });

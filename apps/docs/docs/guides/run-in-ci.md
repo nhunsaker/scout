@@ -10,11 +10,14 @@ Scan a repo on every push to `main` and upload the result to your dashboard, wit
 Before you start:
 
 - The repo has the CLI as a dev dependency and a committed `scout.config.json`. See [Install the CLI](/docs/guides/install) and [Configure a scan](/docs/guides/configure-a-scan).
-- The dashboard accepts a CI upload token. Whoever runs it sets that up once, as described in [Deploy the dashboard](/docs/guides/deploy-the-dashboard#let-ci-upload).
+- The repo is already on the dashboard, because someone uploaded its first scan while signed in. See [Authenticate the CLI for uploads](/docs/guides/authenticate-uploads).
+- You're an Editor or Admin on the dashboard.
 
-## 1. Store the token as a CI secret
+## 1. Create the repo's CI upload token
 
-Get the CI upload token from whoever runs the dashboard. In the repo's GitHub settings, add it as an Actions secret named `SCOUTUI_TOKEN`.
+On the dashboard, open the repo's page and press **⋯**, then **Settings**, then **Create token**. Press **Copy**, and in the repo's GitHub settings add the token as an Actions secret named `SCOUTUI_TOKEN`. Then press **Done**.
+
+The token is shown only once. If you lose it, or the repo already has one, press **Regenerate** for a new one.
 
 ## 2. Add the workflow
 
@@ -79,7 +82,7 @@ Match the error in the job log. To see the detail behind it, such as the dashboa
 | `Error: Couldn't upload the scan: this Nuxt app hasn't been prepared.` | The Nuxt app's `.nuxt/` folder wasn't generated. | Add `npx nuxt prepare` after the install step. |
 | `Error: Couldn't upload the scan: no uses were found.` | The scan found nothing in the files it read. | See [Check that the scan reads your files](/docs/guides/configure-a-scan#check-that-the-scan-reads-your-files). |
 | `Error: Couldn't upload the scan: <host> didn't answer like a Scout dashboard.` | The address isn't the dashboard's, or it has a typo. | Check `SCOUTUI_HOST`, or `host` in the config. |
-| `Error: Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN.` | The token doesn't match the dashboard's, or the dashboard has no CI upload token set. | Copy the token again from whoever runs the dashboard. |
+| `Error: Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.` | The secret holds another repo's token or something else, the token was regenerated or revoked, or the repo was deleted from the dashboard. | Press **Regenerate** on the repo's Settings page, or **Create token** if it has none, and update the secret. If the repo is no longer on the dashboard, first upload a scan of it while signed in. |
 | `Error: Not signed in to <host>.` | `SCOUTUI_TOKEN` was empty. | Check the secret's name, and that the job can read it. |
 | `Error: Couldn't upload the scan: no dashboard address is set.` | No host was set. | Set `SCOUTUI_HOST`, or add `host` to the config. |
 | `Error: <host> doesn't use https://` | `SCOUTUI_HOST` starts with `http://`. | Use the dashboard's `https://` address. |

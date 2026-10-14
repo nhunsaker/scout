@@ -13,6 +13,7 @@ const messages = {
   scanned_with_newer_cli: "This commit was scanned with a newer CLI",
   unsupported_scanner: "Couldn't upload the scan: it comes from a CLI this dashboard no longer accepts. Install @scoutui/cli and scan again.",
   repo_remote_mismatch: "Couldn't upload the scan: this repository name on the dashboard comes from a different remote.",
+  token_rejected: "Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.",
 } as const;
 
 export type ScanValidationCode = keyof typeof messages;

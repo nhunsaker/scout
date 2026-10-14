@@ -26,7 +26,7 @@ export function sampleArtifact(
   return scan;
 }
 
-export async function receiveArtifact(pool: Pool, value: unknown, options: { rescan?: boolean } = {}): Promise<string> {
+export async function receiveArtifact(pool: Pool, value: unknown, options: { rescan?: boolean; tokenRepoId?: string | null } = {}): Promise<string> {
   const bytes = Buffer.isBuffer(value) ? value : gzipSync(Buffer.from(JSON.stringify(value)));
   async function* body() { yield bytes; }
   const limits = { maxWireBytes: 16 * 1024 * 1024, maxStoredBytes: 16 * 1024 * 1024, timeoutMs: 10_000 };

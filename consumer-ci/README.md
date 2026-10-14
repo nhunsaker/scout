@@ -8,14 +8,16 @@ adoption time-series.
 
 It runs each target in two steps, so the target's install and codegen
 (`nuxt prepare` and the like) run code from the target's latest commit without
-the upload token in their environment:
+the CI upload tokens in their environment:
 
 1. `--step prepare --work-dir <dir>` clones and installs the target into
    `<dir>/<target name>`, with no secrets.
 2. `--step scan --work-dir <dir>` scans that work tree and uploads, with
-   `SCOUTUI_HOST` and `SCOUTUI_TOKEN` set.
+   `SCOUTUI_HOST` set and each scan's CI upload token in the environment
+   variable its `tokenSecret` names in `targets.ts`. Each token comes from
+   that repo's Settings page on the dashboard.
 
-Both steps run in the same job, so this keeps the token out of the target's
+Both steps run in the same job, so this keeps the tokens out of the target's
 code only while that code runs: a process it leaves behind, or a file it
 changes, is still there when the scan step runs. Without `--step`, one run
 does both and removes the work tree afterward.
@@ -35,7 +37,8 @@ yarn workspace consumer-ci run cadence --target elk --step prepare --work-dir /t
 
 The prepared work tree is ready for the before-and-after scan in
 [Check against a real repo](../CODING_STANDARDS.md#check-against-a-real-repo). The
-scan step uploads, so it needs `SCOUTUI_HOST` and `SCOUTUI_TOKEN`.
+scan step uploads, so it needs `SCOUTUI_HOST` and each scan's CI upload token,
+in the environment variable its `tokenSecret` names in `targets.ts`.
 
 Requires `corepack` enabled (targets are yarn@4). The CLI is invoked by absolute
 path, so a stale pre-rename bin symlink in a target's `node_modules/.bin` won't interfere.
@@ -50,5 +53,6 @@ run, e.g. `YARN_NPM_REGISTRY_SERVER=https://registry.npmjs.org yarn workspace co
 ## Add a target
 
 Append to `targets.ts`. Each scan needs a `repoId` unique across the whole matrix
-(it keys the time-series) and per-app `include` globs. Add the new `name` to the
-workflow's `matrix.target` list.
+(it keys the time-series), per-app `include` globs and a `tokenSecret`. Add the
+new `name` to the workflow's `matrix.target` list, and add each new `tokenSecret`
+to the scan step's `env` the way the others are, so only that target's job gets it.

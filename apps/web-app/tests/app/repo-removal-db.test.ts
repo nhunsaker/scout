@@ -4,6 +4,7 @@ import { PostgresDriver } from "@scoutui/web-shared";
 import { deleteRepo, removeScan } from "@/app/repos/repo-actions";
 import { getPool } from "@/db/client";
 import { REPO_ADMIN_REFUSAL } from "@/lib/access";
+import { createUploadToken } from "@/lib/repo-upload-tokens";
 import { claimScanJob, getUploadStatus } from "@/lib/scan-jobs";
 import { listRemovals } from "@/lib/scan-removal";
 import { processScanJob } from "@/worker/runner";
@@ -119,11 +120,13 @@ describe.skipIf(!RUN_DB)("removing scans and deleting repos against PostgreSQL",
     await upload("scan-a", 1);
     await upload("scan-b", 2);
     const other = await upload("scan-c", 1, "repo-b");
+    expect(await createUploadToken(pool, "ana@example.com", "repo-a")).toMatchObject({ ok: true });
 
     expect(await deleteRepo("repo-a")).toBeUndefined();
 
     expect(navigation.redirect).toHaveBeenCalledWith("/repos");
     expect(await stored()).toEqual({ repos: ["repo-b"], scans: ["scan-c"], uploads: [other], archives: [other], read_models: ["scan-c"] });
+    expect((await pool.query("SELECT repo_id FROM repo_upload_tokens")).rows).toEqual([]);
     expect(await queuedJobs()).toEqual([{ kind: "results", scan_id: null }]);
     expect(await listRemovals(pool, 20)).toEqual([
       expect.objectContaining({ actorEmail: "ana@example.com", repoId: "repo-a", commitSha: null, scanCount: 2 }),

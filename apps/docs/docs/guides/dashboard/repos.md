@@ -15,7 +15,7 @@ Select **repos** in the top navigation. The dashboard opens here. Each row is on
 
 Type in the search box to match a repo's id, git remote or branch. Press the **since previous scan** chip to list only repos whose latest scan differs from the one before. Select a row to open the repo page.
 
-If the list reads **No repos scanned yet.**, no scan has been uploaded. [Run in CI](/docs/guides/run-in-ci) sets up uploads from CI.
+If the list reads **No repos scanned yet.**, no scan has been uploaded. Upload a repo's first scan while signed in ([Authenticate the CLI for uploads](/docs/guides/authenticate-uploads)), then [Run in CI](/docs/guides/run-in-ci) to upload from CI.
 
 ## Read a repo page
 
@@ -110,9 +110,9 @@ If a page shows **Preparing scan data** instead of its content, the dashboard is
 [Admins](/docs/guides/manage-people-and-roles) can remove a scan that shouldn't count, such as a test run or a scan of the wrong branch, and delete a repo.
 
 - **Remove a scan.** On the repo's **Scan history**, press **⋯** at the end of the scan's row, select **Remove scan**, then press **Remove**. If it was the latest scan, the scan before it becomes the latest. This can't be undone. On a repo's only scan the menu offers **Delete repo…** instead.
-- **Delete a repo.** On the repo page, press **⋯** beside the repo's name and select **Delete repo…**. Type the repo's id, then press **Delete repo**. The repo and all its scans are deleted, and the repos list opens. The repo comes back the next time a scan of it is uploaded.
+- **Delete a repo.** On the repo page, press **⋯**, then **Settings**, then **Delete repo…**. Type the repo's id, then press **Delete repo**. The repo and all its scans are deleted, and the repos list opens. The repo comes back the next time someone uploads a scan of it. Its CI upload token is deleted too. To upload from CI again, upload a scan of it while signed in, then [create a new token](/docs/guides/run-in-ci).
 
-Charts leave out what you removed, earlier points included. A saved chart about a deleted repo stays, and its scope reads **storefront · missing**. **History** on the **Settings** page records who removed or deleted what.
+Charts leave out what you removed, earlier points included. A saved chart about a deleted repo stays, and its scope reads **storefront · missing**. [**History** on the dashboard's **Settings** page](/docs/guides/manage-people-and-roles#see-who-changed-what) records who removed or deleted what.
 
 ## Next step
 

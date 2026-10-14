@@ -10,6 +10,14 @@ export const repos = pgTable("repos", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** A repo's CI upload token, stored hashed. A repo has at most one. */
+export const repoUploadTokens = pgTable("repo_upload_tokens", {
+  repoId: text("repo_id").primaryKey().references(() => repos.repoId, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdByEmail: text("created_by_email").notNull(),
+});
+
 export const scans = pgTable(
   "scans",
   {
@@ -290,6 +298,7 @@ const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 export const scanUploads = pgTable("scan_uploads", {
   uploadId: text("upload_id").primaryKey(),
   uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  tokenRepoId: text("token_repo_id"),
   encoding: text("encoding", { enum: ["gzip"] }).notNull(),
   storedBytes: bigint("stored_bytes", { mode: "number" }).notNull().default(0),
   checksum: text("checksum"),

@@ -41,7 +41,7 @@ export function DeleteRepoDialog({ repoId, scanCount, open, onOpenChange }: {
           <div className="space-y-1.5">
             <DialogTitle>Delete <span className="font-mono">{repoId}</span>?</DialogTitle>
             <DialogDescription>
-              {`This deletes the repo and its ${scanCount.toLocaleString()} ${scanCount === 1 ? "scan" : "scans"}. It comes back the next time a scan of it is uploaded.`}
+              {`This deletes the repo and its ${scanCount.toLocaleString()} ${scanCount === 1 ? "scan" : "scans"}. It comes back the next time someone uploads a scan of it.`}
             </DialogDescription>
           </div>
           <div className="space-y-1.5">

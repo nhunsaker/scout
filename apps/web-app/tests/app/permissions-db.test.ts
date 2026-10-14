@@ -4,8 +4,11 @@ import type { DashboardInput, GovernanceInput, TagInput } from "@scoutui/web-sha
 import { deleteDashboard, saveDashboard, setDashboardVisibility } from "@/app/charts/dashboard-actions";
 import { deleteGovernance, saveGovernance } from "@/app/governance/governance-actions";
 import { deleteTag, quickTagPackage, saveTag } from "@/app/packages/tag-actions";
+import { createToken, regenerateToken, revokeToken } from "@/app/repos/repo-actions";
+import { removeFromPeople } from "@/app/settings/people-actions";
 import { getPool } from "@/db/client";
 import { CHART_REFUSAL, EDIT_REFUSAL } from "@/lib/access";
+import { repoSettings, TOKEN_CHANGED } from "@/lib/repo-upload-tokens";
 import { getStorage } from "@/lib/storage";
 import { insertPerson } from "../helpers/people";
 import { openReadModelDatabase } from "../helpers/read-model-db";
@@ -66,6 +69,7 @@ describe.skipIf(!RUN_DB)("edit actions against PostgreSQL", () => {
     await pool.query("DELETE FROM dashboards");
     await pool.query("DELETE FROM governance");
     await pool.query("DELETE FROM tags");
+    await pool.query("DELETE FROM repos");
     await pool.query('DELETE FROM "user"');
   });
 
@@ -209,6 +213,64 @@ describe.skipIf(!RUN_DB)("edit actions against PostgreSQL", () => {
       await pool.query(`UPDATE "user" SET role = 'editor' WHERE id = $1`, [viewer]);
       expect(await saveTag(tag)).toEqual({ ok: true });
       expect(await count("tags")).toBe(1);
+    });
+  });
+
+  describe("CI upload tokens", () => {
+    const tokens = async () => (await pool.query("SELECT repo_id, token_hash, created_by_email FROM repo_upload_tokens")).rows;
+    const refused = { ok: false, error: EDIT_REFUSAL };
+
+    beforeEach(async () => {
+      await pool.query("INSERT INTO repos (repo_id) VALUES ('repo-a')");
+    });
+
+    it("refuses a Viewer's create, and their regenerate and revoke of an Editor's token, which stays as it was", async () => {
+      signInAs(viewer);
+      expect(await createToken("repo-a")).toEqual(refused);
+      expect(await tokens()).toEqual([]);
+      signInAs(editor);
+      expect(await createToken("repo-a")).toMatchObject({ ok: true, token: expect.stringMatching(/^scout_r_/) });
+      const made = await tokens();
+      expect(made).toEqual([expect.objectContaining({ repo_id: "repo-a", created_by_email: "bo@example.com" })]);
+      expect(await repoSettings(pool, "repo-a")).toEqual({ scanCount: 0, token: { createdAt: expect.any(String), createdByEmail: "bo@example.com" } });
+      signInAs(viewer);
+      expect(await regenerateToken("repo-a")).toEqual(refused);
+      expect(await revokeToken("repo-a")).toEqual(refused);
+      expect(await tokens()).toEqual(made);
+    });
+
+    it("refuses a second create while the repo has a token and keeps the first, regenerates it, and refuses a regenerate once it's revoked", async () => {
+      signInAs(editor);
+      const first = await createToken("repo-a");
+      const made = await tokens();
+      expect(await createToken("repo-a")).toEqual({ ok: false, error: TOKEN_CHANGED });
+      expect(await tokens()).toEqual(made);
+      expect(first.ok).toBe(true);
+      const regenerated = await regenerateToken("repo-a");
+      expect(regenerated).toMatchObject({ ok: true, token: expect.stringMatching(/^scout_r_/) });
+      expect((await tokens())[0].token_hash).not.toBe(made[0].token_hash);
+      expect(await revokeToken("repo-a")).toEqual({ ok: true });
+      expect(await regenerateToken("repo-a")).toEqual({ ok: false, error: TOKEN_CHANGED });
+      expect(await tokens()).toEqual([]);
+    });
+
+    it("reports a token whose creator email is empty, with the creator email null", async () => {
+      signInAs(editor);
+      await createToken("repo-a");
+      await pool.query("UPDATE repo_upload_tokens SET created_by_email = ''");
+      expect(await repoSettings(pool, "repo-a")).toEqual({ scanCount: 0, token: { createdAt: expect.any(String), createdByEmail: null } });
+    });
+
+    it("keeps a token and its creator's email once the creator is removed from People, and lets an Admin regenerate and revoke it", async () => {
+      const admin = await insertPerson(pool, { email: "di@example.com", role: "admin" });
+      signInAs(editor);
+      await createToken("repo-a");
+      signInAs(admin);
+      expect(await removeFromPeople(editor)).toEqual({ ok: true });
+      expect(await repoSettings(pool, "repo-a")).toEqual({ scanCount: 0, token: { createdAt: expect.any(String), createdByEmail: "bo@example.com" } });
+      expect(await regenerateToken("repo-a")).toMatchObject({ ok: true, token: expect.stringMatching(/^scout_r_/) });
+      expect(await revokeToken("repo-a")).toEqual({ ok: true });
+      expect(await tokens()).toEqual([]);
     });
   });
 });

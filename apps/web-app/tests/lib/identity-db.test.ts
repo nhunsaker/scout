@@ -198,23 +198,6 @@ describe.skipIf(!RUN_DB)("identify and recordSignIn against PostgreSQL", () => {
   });
 });
 
-describe("identify with the CI upload secret", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("recognises the CI upload secret, and nobody for a wrong, longer or unprefixed secret, or once the secret is unset", async () => {
-    vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", "ci-secret-1234");
-    expect(await identify({ bearer: "Bearer ci-secret-1234" })).toEqual({ kind: "ci" });
-    expect(await identify({ bearer: "Bearer ci-secret-9999" })).toBeNull();
-    expect(await identify({ bearer: "Bearer ci-secret-12345" })).toBeNull();
-    expect(await identify({ bearer: "ci-secret-1234" })).toBeNull();
-    expect(await identify({ bearer: null })).toBeNull();
-    vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", undefined);
-    expect(await identify({ bearer: "Bearer ci-secret-1234" })).toBeNull();
-  });
-});
-
 describe("can", () => {
   const person = (role: Role): Identity => ({
     kind: "person", userId: "u1", email: "ana@example.com", name: null, role, roleSource: "people",
@@ -232,11 +215,11 @@ describe("can", () => {
     { who: "an Editor", identity: person("editor"), action: "manage-repos", allowed: false },
     { who: "an Admin", identity: person("admin"), action: "manage-people", allowed: true },
     { who: "an Admin", identity: person("admin"), action: "manage-repos", allowed: true },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "upload", allowed: true },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "view", allowed: false },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "edit", allowed: false },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "manage-people", allowed: false },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "manage-repos", allowed: false },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "upload", allowed: true },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "view", allowed: false },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "edit", allowed: false },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "manage-people", allowed: false },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "manage-repos", allowed: false },
   ];
 
   it.each(rows)("$who may $action: $allowed", ({ identity, action, allowed }) => {
@@ -247,7 +230,7 @@ describe("can", () => {
   const mine = (visibility: "private" | "everyone") => ({ createdByUserId: "u1", visibility });
   const chartRows: { who: string; identity: Identity | null; action: Action; chart: string; target: ChartTarget; allowed: boolean }[] = [
     { who: "nobody", identity: null, action: "view", chart: "an Everyone chart", target: theirs("everyone"), allowed: false },
-    { who: "the CI secret", identity: { kind: "ci" }, action: "view", chart: "an Everyone chart", target: theirs("everyone"), allowed: false },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "view", chart: "an Everyone chart", target: theirs("everyone"), allowed: false },
     { who: "a Viewer", identity: person("viewer"), action: "view", chart: "someone else's Everyone chart", target: theirs("everyone"), allowed: true },
     { who: "an Editor", identity: person("editor"), action: "view", chart: "someone else's private chart", target: theirs("private"), allowed: false },
     { who: "a Viewer", identity: person("viewer"), action: "view", chart: "their own private chart", target: mine("private"), allowed: true },
@@ -262,5 +245,14 @@ describe("can", () => {
 
   it.each(chartRows)("$who may $action $chart: $allowed", ({ identity, action, target, allowed }) => {
     expect(can(identity, action, { chart: target })).toBe(allowed);
+  });
+
+  const repoRows: { who: string; identity: Identity; action: Action; repo: string; target: { repoId: string }; allowed: boolean }[] = [
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "upload", repo: "scans of its own repo", target: { repoId: "repo-a" }, allowed: true },
+    { who: "a repo token", identity: { kind: "repo-token", repoId: "repo-a" }, action: "upload", repo: "scans of another repo", target: { repoId: "repo-b" }, allowed: false },
+  ];
+
+  it.each(repoRows)("$who may $action $repo: $allowed", ({ identity, action, target, allowed }) => {
+    expect(can(identity, action, target)).toBe(allowed);
   });
 });

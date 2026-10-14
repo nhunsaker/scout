@@ -192,7 +192,11 @@ export function repoScanUrl(repoId: string): string {
 const UPLOAD_POLL_SECONDS = 2;
 export const processingFailed: ScanJobError = { code: "processing_failed", message: "Couldn't upload the scan: the dashboard hit an error while processing it. Try again, or ask your dashboard administrator to check its logs." };
 
-export async function getUploadStatus(pool: Pool, uploadId: string): Promise<UploadStatus | null> {
+/**
+ * The status of upload `uploadId`, or null when there's none or it's still being received. With `tokenRepoId`, only an upload made
+ * with that repo's token is found.
+ */
+export async function getUploadStatus(pool: Pool, uploadId: string, tokenRepoId: string | null = null): Promise<UploadStatus | null> {
   const { rows: [row] } = await pool.query<ScanModelHeader & {
     receipt_state: UploadStatus["state"]; scan_id: string | null; repo_id: string | null;
     error_code: string | null; error_message: string | null; replaced: boolean; stage: string | null; wait_seconds: number | null;
@@ -206,7 +210,7 @@ export async function getUploadStatus(pool: Pool, uploadId: string): Promise<Upl
     LEFT JOIN LATERAL (
       SELECT stage, available_at FROM scan_jobs WHERE scan_jobs.upload_id = receipt.upload_id ORDER BY created_at DESC LIMIT 1
     ) AS job ON true
-    WHERE receipt.upload_id = $1 AND receipt.state <> 'receiving'`, [uploadId]);
+    WHERE receipt.upload_id = $1 AND receipt.state <> 'receiving' AND ($2::text IS NULL OR receipt.token_repo_id = $2)`, [uploadId, tokenRepoId]);
   if (!row) return null;
   const state = row.receipt_state;
   if (state === "failed") {

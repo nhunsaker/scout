@@ -7,6 +7,7 @@ import {
 import { deleteReadModelRows, writeReadModelRows } from "./read-model-write.ts";
 import { commitDecision, storedScans } from "./scan-acceptance.ts";
 import { repoIdentityRefusal } from "./repo-identity.ts";
+import { uploadTokenRefusal } from "./repo-upload-tokens.ts";
 import { deleteScans } from "./scan-removal.ts";
 import { readStoredArtifact } from "./stored-artifact.ts";
 import { completeScanJob } from "./scan-jobs.ts";
@@ -17,7 +18,7 @@ export type PublicationGuard = { jobId: string; leaseToken: string };
  * `rescan` lets an upload replace its commit's stored scan. Without it, an upload of a stored commit is a duplicate of that scan,
  * unless the stored scan can't be read and no rebuild of it is queued or running: then the upload replaces it.
  */
-export type PublishOptions = { uploadedByUserId: string | null; signal?: AbortSignal; force?: boolean; rescan?: boolean }
+export type PublishOptions = { uploadedByUserId: string | null; tokenRepoId?: string | null; signal?: AbortSignal; force?: boolean; rescan?: boolean }
   & ({ sourceUploadId?: undefined; guard?: PublicationGuard } | { sourceUploadId: string; guard: PublicationGuard });
 export type PublishResult = { status: "inserted" | "rebuilt" | "exists"; scanId: string; revision: number };
 /** An incoming scan whose full artifact the publisher clears once an existing canonical scan makes it unnecessary. */
@@ -147,6 +148,10 @@ async function attemptPublication(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (options.tokenRepoId) {
+      const refusal = await uploadTokenRefusal(client, { tokenRepoId: options.tokenRepoId, repoId: meta.repo.id });
+      if (refusal) throw new ScanValidationError(refusal.code, refusal.message);
+    }
     await client.query(`INSERT INTO repos (repo_id, git_remote) VALUES ($1, $2)
       ON CONFLICT (repo_id) DO UPDATE SET updated_at = now(), git_remote = COALESCE(repos.git_remote, EXCLUDED.git_remote)`, [meta.repo.id, canonical ? null : (input?.meta ?? meta).repo.gitRemote]);
     const { rows: [locked] } = await client.query<ScanRow>("SELECT repo_id, commit_sha, scanner_version, source_upload_id FROM scans WHERE scan_id = $1 FOR UPDATE", [scanId]);

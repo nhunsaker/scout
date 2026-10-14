@@ -537,7 +537,7 @@ describe("runScan pre-scan check", () => {
 
   it.each<[number, Record<string, string>, string, number]>([
     [400, { error: "invalid request body" }, `Error: ${DASHBOARD_ERROR}\nThe dashboard replied: HTTP 400 {"error":"invalid request body"}\n`, 1],
-    [401, { error: "unauthorized" }, "Error: Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Check that it matches the dashboard's upload token.\n", 1],
+    [401, { error: "unauthorized" }, "Error: Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.\n", 1],
     [429, { error: "rate_limited" }, `Error: ${BUSY}\nThe dashboard replied: HTTP 429 {"error":"rate_limited"}\n`, 1],
     [500, { error: "server_error" }, `Error: ${DASHBOARD_ERROR}\nThe dashboard replied: HTTP 500 {"error":"server_error"}\n`, 1],
     [503, { error: "unavailable" }, `Error: ${BUSY}\nThe dashboard replied: HTTP 503 {"error":"unavailable"}\n`, 3],

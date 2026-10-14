@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { cloneSteps, scanArgs, scanConfig } from "./run-in-repo.js";
+import { cloneSteps, scanArgs, scanConfig, scanEnv } from "./run-in-repo.js";
 import type { ScanSpec, Target } from "./types.js";
 
 const target: Target = {
@@ -13,6 +13,7 @@ const scan: ScanSpec = {
   cwd: "apps/web",
   repoId: "repo/web",
   include: ["src/**/*.ts"],
+  tokenSecret: "SCOUTUI_TOKEN_REPO_WEB",
 };
 
 describe("cloneSteps", () => {
@@ -62,5 +63,13 @@ describe("scanArgs", () => {
     expect(scanArgs("/c.json", undefined, true)).toEqual([
       "scan", "--config", "/c.json", "--rescan",
     ]);
+  });
+});
+
+describe("scanEnv", () => {
+  test("gives each scan its own repo's token as SCOUTUI_TOKEN", () => {
+    const env = { SCOUTUI_TOKEN_REPO_WEB: "web-token", SCOUTUI_TOKEN_REPO_API: "api-token", PATH: "/bin" };
+    expect(scanEnv({ ...scan, tokenSecret: "SCOUTUI_TOKEN_REPO_WEB" }, env)).toMatchObject({ SCOUTUI_TOKEN: "web-token", PATH: "/bin" });
+    expect(scanEnv({ ...scan, tokenSecret: "SCOUTUI_TOKEN_REPO_MISSING" }, env)).toMatchObject({ SCOUTUI_TOKEN: "" });
   });
 });

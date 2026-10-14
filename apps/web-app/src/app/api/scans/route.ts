@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getPool } from "@/db/client";
 import { can, UPLOAD_REFUSAL } from "@/lib/access";
 import { identify } from "@/lib/identity";
-import { rateLimit, clientKey, logRateLimitRejection } from "@/lib/rate-limit";
+import { rateLimit, logRateLimitRejection } from "@/lib/rate-limit";
 import { tooLarge } from "@/lib/request-body";
 import { receiveUpload, UploadReceiveError } from "@/lib/scan-archive";
 import { errorClass, uploadQueueFull } from "@/lib/scan-jobs";
@@ -97,7 +97,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: UPLOAD_REFUSAL.code, refusal: UPLOAD_REFUSAL }, { status: 403 });
   }
 
-  const key = identity.kind === "ci" ? `scans:ci:${clientKey(req)}` : `scans:user:${identity.userId}`;
+  const key = identity.kind === "repo-token" ? `scans:repo:${identity.repoId}` : `scans:user:${identity.userId}`;
   const limited = rateLimit(key, UPLOAD_LIMIT, UPLOAD_WINDOW_MS);
   if (!limited.ok) {
     logRateLimitRejection("scans", key);
@@ -126,9 +126,9 @@ export async function POST(req: Request): Promise<Response> {
       return unavailable("scan upload queue is full; retry later");
     }
     const { uploadId } = await receiveUpload(
-      pool, requestBody(req.body, req.signal), encoding, identity.kind === "ci" ? null : identity.userId,
+      pool, requestBody(req.body, req.signal), encoding, identity.kind === "person" ? identity.userId : null,
       { maxWireBytes: config.maxWireBytes, maxStoredBytes: config.maxStoredBytes, timeoutMs: config.receiveTimeoutMs, maxQueuedUploads: config.maxQueuedUploads },
-      req.signal, { rescan: new URL(req.url).searchParams.get("rescan") === "1" },
+      req.signal, { rescan: new URL(req.url).searchParams.get("rescan") === "1", tokenRepoId: identity.kind === "repo-token" ? identity.repoId : null },
     );
     const statusUrl = `/api/scans/uploads/${uploadId}`;
     return NextResponse.json({ uploadId, statusUrl }, { status: 202, headers: { Location: statusUrl } });
