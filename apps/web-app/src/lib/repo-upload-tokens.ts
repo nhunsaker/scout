@@ -67,7 +67,7 @@ export async function uploadTokenRefusal(db: Pool | PoolClient, upload: { tokenR
       message: `Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for ${tokenRepoId}, not ${repoId}. Use ${repoId}'s own token, from its Settings page on the dashboard.`,
     };
   }
-  const { rowCount } = await db.query("SELECT 1 FROM repos WHERE repo_id = $1 FOR SHARE", [repoId]);
+  const { rowCount } = await db.query("SELECT 1 FROM repos WHERE repo_id = $1 FOR KEY SHARE", [repoId]);
   if (rowCount) return null;
   return {
     code: "repo_not_on_dashboard",
