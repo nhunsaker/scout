@@ -7,6 +7,7 @@ import { dashboardWarning } from "@/lib/dashboard-warning";
 import { identify } from "@/lib/identity";
 import { rateLimit, logRateLimitRejection } from "@/lib/rate-limit";
 import { repoIdentityRefusal } from "@/lib/repo-identity";
+import { uploadTokenRefusal } from "@/lib/repo-upload-tokens";
 import { readJsonBody } from "@/lib/request-body";
 import { acceptScan, commitDecision, SCAN_FORMATS, storedScans } from "@/lib/scan-acceptance";
 import { errorClass, repoScanUrl } from "@/lib/scan-jobs";
@@ -66,7 +67,9 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const pool = getPool();
-    const refusal = acceptScan({ schemaVersion: scan.schemaVersion, scannerName: scan.scanner }, { matchingCli: { version: builtWithCli, command: "scan" } })
+    const tokenRefusal = identity.kind === "repo-token" ? await uploadTokenRefusal(pool, { tokenRepoId: identity.repoId, repoId: scan.repoId }) : null;
+    const refusal = tokenRefusal
+      ?? acceptScan({ schemaVersion: scan.schemaVersion, scannerName: scan.scanner }, { matchingCli: { version: builtWithCli, command: "scan" } })
       ?? await repoIdentityRefusal(pool, { repoId: scan.repoId, remote: scan.remote });
     if (refusal) return NextResponse.json({ refusal, commits: [], warning: dashboardWarning(), scanFormats: SCAN_FORMATS });
     const stored = await storedScans(pool, scan.repoId, scan.commits);

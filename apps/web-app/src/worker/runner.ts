@@ -29,11 +29,13 @@ function invalidScan(path: string): ScanValidationError {
   return new ScanValidationError("invalid_artifact", undefined, path);
 }
 
-async function decodeUpload(pool: Pool, uploadId: string, signal: AbortSignal): Promise<{ source: ScanSource; uploadedByUserId: string | null }> {
+async function decodeUpload(
+  pool: Pool, uploadId: string, signal: AbortSignal,
+): Promise<{ source: ScanSource; uploadedByUserId: string | null; tokenRepoId: string | null }> {
   const client = await pool.connect();
   try {
-    const { rows: [receipt] } = await client.query<{ uploaded_by_user_id: string | null }>(
-      "SELECT uploaded_by_user_id FROM scan_uploads WHERE upload_id = $1", [uploadId]);
+    const { rows: [receipt] } = await client.query<{ uploaded_by_user_id: string | null; token_repo_id: string | null }>(
+      "SELECT uploaded_by_user_id, token_repo_id FROM scan_uploads WHERE upload_id = $1", [uploadId]);
     signal.throwIfAborted();
     const decoded = await decodeCanonicalSource(client, { uploadId }, scanUploadConfig().maxDecodedBytes);
     signal.throwIfAborted();
@@ -51,7 +53,7 @@ async function decodeUpload(pool: Pool, uploadId: string, signal: AbortSignal): 
     const artifact = validated.artifact;
     const refusal = acceptScan({ schemaVersion: artifact.meta.schemaVersion, scannerName: artifact.meta.scannerName });
     if (refusal) throw refusalError(refusal);
-    return { source: { meta: artifact.meta, artifact }, uploadedByUserId: receipt?.uploaded_by_user_id ?? null };
+    return { source: { meta: artifact.meta, artifact }, uploadedByUserId: receipt?.uploaded_by_user_id ?? null, tokenRepoId: receipt?.token_repo_id ?? null };
   } finally {
     client.release();
   }
@@ -80,7 +82,9 @@ export async function processScanJob(pool: Pool, job: ClaimedScanJob, signal: Ab
       const upload = await decodeUpload(pool, job.uploadId, aborted);
       await setScanJobStage(pool, job, "publishing");
       log(job, "publishing");
-      const result = await publishScanSource(pool, upload.source, { uploadedByUserId: upload.uploadedByUserId, sourceUploadId: job.uploadId, guard, signal: aborted, rescan: job.rescan });
+      const result = await publishScanSource(pool, upload.source, {
+        uploadedByUserId: upload.uploadedByUserId, tokenRepoId: upload.tokenRepoId, sourceUploadId: job.uploadId, guard, signal: aborted, rescan: job.rescan,
+      });
       log(job, `ready ${result.status}`);
     } else if (job.scanId) {
       await setScanJobStage(pool, job, "publishing");

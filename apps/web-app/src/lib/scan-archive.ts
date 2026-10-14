@@ -20,7 +20,7 @@ export class UploadReceiveError extends Error {
 
 export async function receiveUpload(
   pool: Pool, input: AsyncIterable<Uint8Array>, encoding: "gzip" | "identity",
-  uploadedByUserId: string | null, limits: ReceiveLimits, signal: AbortSignal, options: { rescan?: boolean } = {},
+  uploadedByUserId: string | null, limits: ReceiveLimits, signal: AbortSignal, options: { rescan?: boolean; tokenRepoId?: string | null } = {},
 ): Promise<{ uploadId: string }> {
   for (const value of Object.values(limits)) {
     if (value !== null && value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error("Upload limits must be positive safe integers");
@@ -54,7 +54,8 @@ export async function receiveUpload(
     }));
     await race(client.query("BEGIN"));
     const uploadId = randomUUID();
-    await race(client.query("INSERT INTO scan_uploads (upload_id, uploaded_by_user_id, encoding) VALUES ($1, $2, 'gzip')", [uploadId, uploadedByUserId]));
+    await race(client.query("INSERT INTO scan_uploads (upload_id, uploaded_by_user_id, token_repo_id, encoding) VALUES ($1, $2, $3, 'gzip')",
+      [uploadId, uploadedByUserId, options.tokenRepoId ?? null]));
     async function* wire() {
       let wireBytes = 0;
       for (;;) {

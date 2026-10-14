@@ -179,10 +179,10 @@ describe.skipIf(!databaseUrl)("POST /api/scans reception", { timeout: 30_000 }, 
     expect(zlib.syncCalls).toEqual([]);
   });
 
-  it("records a CI upload without a user", async () => {
+  it("records the token's repo on an upload made with a repo token, and no person", async () => {
     identity.value = { kind: "repo-token", repoId: "repo-a" };
     expect((await POST(request(Buffer.from("{}")))).status).toBe(202);
-    expect((await pool.query("SELECT uploaded_by_user_id FROM scan_uploads")).rows).toEqual([{ uploaded_by_user_id: null }]);
+    expect((await pool.query("SELECT uploaded_by_user_id, token_repo_id FROM scan_uploads")).rows).toEqual([{ uploaded_by_user_id: null, token_repo_id: "repo-a" }]);
   });
 
   it("carries the rescan flag onto the upload's job", async () => {

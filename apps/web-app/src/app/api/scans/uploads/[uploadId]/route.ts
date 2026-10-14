@@ -1,27 +1,28 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/db/client";
-import { can } from "@/lib/access";
+import { can, type Identity } from "@/lib/access";
 import { identify } from "@/lib/identity";
 import { errorClass, getUploadStatus } from "@/lib/scan-jobs";
 
-async function authorized(req: Request): Promise<boolean> {
+async function caller(req: Request): Promise<Identity | null> {
   const header = req.headers.get("authorization");
-  const identity = header ? await identify({ bearer: header }) : await identify({ browser: true });
-  return can(identity, "view") || can(identity, "upload");
+  return header ? identify({ bearer: header }) : identify({ browser: true });
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ uploadId: string }> }): Promise<Response> {
+  let identity: Identity | null;
   try {
-    if (!await authorized(req)) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+    identity = await caller(req);
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
+  }
+  if (!can(identity, "view") && !can(identity, "upload")) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const { uploadId } = await params;
   let status: Awaited<ReturnType<typeof getUploadStatus>>;
   try {
-    status = await getUploadStatus(getPool(), uploadId);
+    status = await getUploadStatus(getPool(), uploadId, identity?.kind === "repo-token" ? identity.repoId : null);
   } catch (error) {
     console.error(`[scans] upload status failed: ${errorClass(error)}`);
     return NextResponse.json({ error: "upload status unavailable; retry later" }, {

@@ -136,8 +136,10 @@ describe.skipIf(!databaseUrl)("GET /api/scans/uploads/[uploadId]", { timeout: 30
 
   it("accepts a user bearer, a repo token and a browser session", async () => {
     const uploadId = await receiveArtifact(pool, sampleArtifact());
+    const tokenUploadId = await receiveArtifact(pool, sampleArtifact(), { tokenRepoId: "repo-a" });
     expect((await status(uploadId, "Bearer user-token")).status).toBe(200);
-    expect((await status(uploadId, "Bearer repo-token")).status).toBe(200);
+    expect((await status(tokenUploadId, "Bearer repo-token")).status).toBe(200);
+    expect((await status(uploadId, "Bearer repo-token")).status).toBe(404);
     session.value = editor;
     const browser = await status(uploadId, null);
     expect(browser.status).toBe(200);

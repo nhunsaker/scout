@@ -128,7 +128,7 @@ export async function POST(req: Request): Promise<Response> {
     const { uploadId } = await receiveUpload(
       pool, requestBody(req.body, req.signal), encoding, identity.kind === "person" ? identity.userId : null,
       { maxWireBytes: config.maxWireBytes, maxStoredBytes: config.maxStoredBytes, timeoutMs: config.receiveTimeoutMs, maxQueuedUploads: config.maxQueuedUploads },
-      req.signal, { rescan: new URL(req.url).searchParams.get("rescan") === "1" },
+      req.signal, { rescan: new URL(req.url).searchParams.get("rescan") === "1", tokenRepoId: identity.kind === "repo-token" ? identity.repoId : null },
     );
     const statusUrl = `/api/scans/uploads/${uploadId}`;
     return NextResponse.json({ uploadId, statusUrl }, { status: 202, headers: { Location: statusUrl } });

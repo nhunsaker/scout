@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { hashToken } from "./cli-session-tokens.ts";
+import type { Refusal } from "./scan-acceptance.ts";
 
 const REPO_UPLOAD_TOKEN_PATTERN = /^scout_r_[A-Za-z0-9_-]{43}$/;
 
@@ -52,4 +53,24 @@ export async function revokeUploadToken(pool: Pool, repoId: string): Promise<voi
 export async function uploadTokenRepo(pool: Pool, token: string): Promise<string | null> {
   const { rows: [row] } = await pool.query<{ repo_id: string }>("SELECT repo_id FROM repo_upload_tokens WHERE token_hash = $1", [hashToken(token)]);
   return row?.repo_id ?? null;
+}
+
+/**
+ * Why the dashboard won't take a scan of `repoId` uploaded with `tokenRepoId`'s CI upload token, or null when it will. A token
+ * uploads only scans of its own repo, and only while that repo is on the dashboard; inside a transaction, the repo stays until it ends.
+ */
+export async function uploadTokenRefusal(db: Pool | PoolClient, upload: { tokenRepoId: string; repoId: string }): Promise<Refusal | null> {
+  const { tokenRepoId, repoId } = upload;
+  if (repoId !== tokenRepoId) {
+    return {
+      code: "token_for_another_repo",
+      message: `Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for ${tokenRepoId}, not ${repoId}. Use ${repoId}'s own token, from its Settings page on the dashboard.`,
+    };
+  }
+  const { rowCount } = await db.query("SELECT 1 FROM repos WHERE repo_id = $1 FOR SHARE", [repoId]);
+  if (rowCount) return null;
+  return {
+    code: "repo_not_on_dashboard",
+    message: `Couldn't upload the scan: ${repoId} was deleted from the dashboard, and its CI upload token with it. Upload a scan of it signed in as an Editor, then create a new token on its Settings page.`,
+  };
 }

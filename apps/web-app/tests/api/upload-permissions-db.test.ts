@@ -11,6 +11,8 @@ import { consumeApprovedDeviceCode } from "@/lib/cli-session-store";
 import { hashToken } from "@/lib/cli-session-tokens";
 import { resetRateLimitState } from "@/lib/rate-limit";
 import { createUploadToken, regenerateUploadToken, revokeUploadToken } from "@/lib/repo-upload-tokens";
+import { claimScanJob } from "@/lib/scan-jobs";
+import { processScanJob } from "@/worker/runner";
 import { insertPerson } from "../helpers/people";
 import { openReadModelDatabase } from "../helpers/read-model-db";
 import { receiveArtifact, sampleArtifact } from "../helpers/scan-artifact";
@@ -80,6 +82,16 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
   async function storedUploads(): Promise<number> {
     return (await pool.query("SELECT count(*)::int AS n FROM scan_uploads")).rows[0].n;
   }
+
+  const runJobs = async () => {
+    for (let job = await claimScanJob(pool, "test"); job; job = await claimScanJob(pool, "test")) {
+      await processScanJob(pool, job, new AbortController().signal);
+    }
+  };
+  const statusWith = (token: string, uploadId: string) =>
+    uploadStatus(get(`/api/scans/uploads/${uploadId}`, token), { params: Promise.resolve({ uploadId }) });
+  const sent = async (token: string, body: string): Promise<string> =>
+    (await (await upload(post("/api/scans", token, body))).json()).uploadId;
 
   beforeAll(async () => {
     database = openReadModelDatabase();
@@ -161,6 +173,63 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     expect((await upload(post("/api/scans", token, "{}"))).status).toBe(401);
   });
 
+  it("answers a pre-scan check of the token's own repo, and refuses one of another repo naming the token's repo", async () => {
+    const token = await repoToken("acme/web");
+    const own = await (await preflight(post("/api/scans/preflight", token, JSON.stringify(check)))).json();
+    expect(own.refusal).toBeNull();
+    const other = await (await preflight(post("/api/scans/preflight", token, JSON.stringify({ ...check, repoId: "acme/api" })))).json();
+    expect(other.refusal).toEqual({
+      code: "token_for_another_repo",
+      message: "Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for acme/web, not acme/api. Use acme/api's own token, from its Settings page on the dashboard.",
+    });
+    expect(other.commits).toEqual([]);
+  });
+
+  it("stores a scan of the token's own repo, and fails one of another repo naming the token's repo, without adding that repo", async () => {
+    const token = await repoToken("repo-a");
+    const own = await sent(token, JSON.stringify(sampleArtifact({ scanId: "scan-a", repoId: "repo-a" })));
+    const other = await sent(token, JSON.stringify(sampleArtifact({ scanId: "scan-b", repoId: "repo-b" })));
+    await runJobs();
+    expect(await (await statusWith(token, own)).json()).toMatchObject({ state: "ready", scanId: "scan-a" });
+    expect(await (await statusWith(token, other)).json()).toMatchObject({
+      state: "failed",
+      error: {
+        code: "token_for_another_repo",
+        message: "Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for repo-a, not repo-b. Use repo-b's own token, from its Settings page on the dashboard.",
+      },
+    });
+    expect((await pool.query("SELECT repo_id FROM repos ORDER BY repo_id")).rows).toEqual([{ repo_id: "repo-a" }]);
+  });
+
+  it("shows a repo's token the uploads made with it and no others", async () => {
+    const token = await repoToken("repo-a");
+    const own = await sent(token, "{}");
+    const editors = await sent(await bearer("editor"), "{}");
+    expect((await statusWith(token, own)).status).toBe(200);
+    expect((await statusWith(token, editors)).status).toBe(404);
+    expect((await statusWith(await bearer("viewer"), editors)).status).toBe(200);
+  });
+
+  it("fails a token's upload whose repo was deleted before it was processed, without bringing the repo back", async () => {
+    const token = await repoToken("repo-a");
+    const uploadId = await sent(token, JSON.stringify(sampleArtifact()));
+    await pool.query("DELETE FROM repos WHERE repo_id = 'repo-a'");
+    await runJobs();
+    expect((await pool.query("SELECT state, error_code, error_message FROM scan_uploads WHERE upload_id = $1", [uploadId])).rows[0]).toEqual({
+      state: "failed", error_code: "repo_not_on_dashboard",
+      error_message: "Couldn't upload the scan: repo-a was deleted from the dashboard, and its CI upload token with it. Upload a scan of it signed in as an Editor, then create a new token on its Settings page.",
+    });
+    expect((await pool.query("SELECT count(*)::int AS n FROM repos")).rows[0].n).toBe(0);
+  });
+
+  it("still stores a scan its token sent before the token was regenerated", async () => {
+    const token = await repoToken("repo-a");
+    const uploadId = await sent(token, JSON.stringify(sampleArtifact()));
+    await regenerateUploadToken(pool, "bo@example.com", "repo-a");
+    await runJobs();
+    expect((await pool.query("SELECT state FROM scan_uploads WHERE upload_id = $1", [uploadId])).rows[0].state).toBe("ready");
+  });
+
   it("no longer takes uploads with SCOUTUI_CI_UPLOAD_TOKEN", async () => {
     vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", "ci-secret-1234");
     expect((await upload(post("/api/scans", "ci-secret-1234", "{}"))).status).toBe(401);
@@ -174,12 +243,11 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     expect((await uploadStatus(get(`/api/scans/uploads/${uploadId}`, null), { params: Promise.resolve({ uploadId }) })).status).toBe(200);
   });
 
-  it("shows an upload's status to a Viewer and the CI upload secret, and to nobody without credentials", async () => {
+  it("shows an upload's status to a Viewer, and to nobody without credentials", async () => {
     const uploadId = await receiveArtifact(pool, sampleArtifact());
     const statusOf = async (token: string | null) =>
       (await uploadStatus(get(`/api/scans/uploads/${uploadId}`, token), { params: Promise.resolve({ uploadId }) })).status;
     expect(await statusOf(await bearer("viewer"))).toBe(200);
-    expect(await statusOf(await repoToken("repo-a"))).toBe(200);
     expect(await statusOf(null)).toBe(401);
   });
 
