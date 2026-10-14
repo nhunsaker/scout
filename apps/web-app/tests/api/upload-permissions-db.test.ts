@@ -28,6 +28,8 @@ const check = {
   commits: ["a1c9e04d2f", "0b5d7e1f3a"],
 };
 
+const TOKEN_REJECTED = "Couldn't upload the scan: the dashboard rejected SCOUTUI_TOKEN. Get a new token from the repo's Settings page on the dashboard.";
+
 function post(path: string, bearer: string | null, body: BodyInit) {
   return new Request(`http://x${path}`, {
     method: "POST", headers: { ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}), "Content-Type": "application/json" }, body, duplex: "half",
@@ -173,30 +175,26 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     expect((await upload(post("/api/scans", token, "{}"))).status).toBe(401);
   });
 
-  it("answers a pre-scan check of the token's own repo, and refuses one of another repo naming the token's repo", async () => {
+  it("answers a pre-scan check of the token's own repo, and refuses one of another repo as it refuses an invalid token", async () => {
     const token = await repoToken("acme/web");
     const own = await (await preflight(post("/api/scans/preflight", token, JSON.stringify(check)))).json();
     expect(own.refusal).toBeNull();
-    const other = await (await preflight(post("/api/scans/preflight", token, JSON.stringify({ ...check, repoId: "acme/api" })))).json();
-    expect(other.refusal).toEqual({
-      code: "token_for_another_repo",
-      message: "Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for acme/web, not acme/api. Use acme/api's own token, from its Settings page on the dashboard.",
-    });
-    expect(other.commits).toEqual([]);
+    const other = await preflight(post("/api/scans/preflight", token, JSON.stringify({ ...check, repoId: "acme/api" })));
+    expect(other.status).toBe(401);
+    expect(await other.json()).toEqual({ error: "unauthorized" });
   });
 
-  it("stores a scan of the token's own repo, and fails one of another repo naming the token's repo, without adding that repo", async () => {
+  it("stores a scan of the token's own repo, and refuses one of another repo without naming either repo or adding that repo", async () => {
     const token = await repoToken("repo-a");
     const own = await sent(token, JSON.stringify(sampleArtifact({ scanId: "scan-a", repoId: "repo-a" })));
     const other = await sent(token, JSON.stringify(sampleArtifact({ scanId: "scan-b", repoId: "repo-b" })));
     await runJobs();
     expect(await (await statusWith(token, own)).json()).toMatchObject({ state: "ready", scanId: "scan-a" });
-    expect(await (await statusWith(token, other)).json()).toMatchObject({
-      state: "failed",
-      error: {
-        code: "token_for_another_repo",
-        message: "Couldn't upload the scan: SCOUTUI_TOKEN is the CI upload token for repo-a, not repo-b. Use repo-b's own token, from its Settings page on the dashboard.",
-      },
+    const refused = await statusWith(token, other);
+    expect(refused.status).toBe(401);
+    expect(await refused.json()).toEqual({ error: "unauthorized" });
+    expect(await (await statusWith(await bearer("viewer"), other)).json()).toEqual({
+      state: "failed", readable: false, error: { code: "token_rejected", message: TOKEN_REJECTED },
     });
     expect((await pool.query("SELECT repo_id FROM repos ORDER BY repo_id")).rows).toEqual([{ repo_id: "repo-a" }]);
   });
@@ -216,8 +214,7 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     await pool.query("DELETE FROM repos WHERE repo_id = 'repo-a'");
     await runJobs();
     expect((await pool.query("SELECT state, error_code, error_message FROM scan_uploads WHERE upload_id = $1", [uploadId])).rows[0]).toEqual({
-      state: "failed", error_code: "repo_not_on_dashboard",
-      error_message: "Couldn't upload the scan: repo-a was deleted from the dashboard, and its CI upload token with it. Upload a scan of it signed in as an Editor, then create a new token on its Settings page.",
+      state: "failed", error_code: "token_rejected", error_message: TOKEN_REJECTED,
     });
     expect((await pool.query("SELECT count(*)::int AS n FROM repos")).rows[0].n).toBe(0);
   });

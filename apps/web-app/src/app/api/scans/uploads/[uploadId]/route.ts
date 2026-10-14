@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPool } from "@/db/client";
 import { can, type Identity } from "@/lib/access";
 import { identify } from "@/lib/identity";
+import { TOKEN_REFUSAL } from "@/lib/repo-upload-tokens";
 import { errorClass, getUploadStatus } from "@/lib/scan-jobs";
 
 async function caller(req: Request): Promise<Identity | null> {
@@ -31,6 +32,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ uploadId
   }
   if (!status) {
     return NextResponse.json({ error: "upload not found" }, { status: 404 });
+  }
+  if (identity?.kind === "repo-token" && status.error?.code === TOKEN_REFUSAL.code) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });
 }

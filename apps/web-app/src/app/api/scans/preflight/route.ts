@@ -67,9 +67,10 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const pool = getPool();
-    const tokenRefusal = identity.kind === "repo-token" ? await uploadTokenRefusal(pool, { tokenRepoId: identity.repoId, repoId: scan.repoId }) : null;
-    const refusal = tokenRefusal
-      ?? acceptScan({ schemaVersion: scan.schemaVersion, scannerName: scan.scanner }, { matchingCli: { version: builtWithCli, command: "scan" } })
+    if (identity.kind === "repo-token" && await uploadTokenRefusal(pool, { tokenRepoId: identity.repoId, repoId: scan.repoId })) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const refusal = acceptScan({ schemaVersion: scan.schemaVersion, scannerName: scan.scanner }, { matchingCli: { version: builtWithCli, command: "scan" } })
       ?? await repoIdentityRefusal(pool, { repoId: scan.repoId, remote: scan.remote });
     if (refusal) return NextResponse.json({ refusal, commits: [], warning: dashboardWarning(), scanFormats: SCAN_FORMATS });
     const stored = await storedScans(pool, scan.repoId, scan.commits);
