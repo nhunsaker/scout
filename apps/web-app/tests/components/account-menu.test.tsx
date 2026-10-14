@@ -114,6 +114,7 @@ const PLACES = [
   { route: "/repos/[repoId]", tab: "repos" },
   { route: "/repos/[repoId]/components/[componentId]", tab: "repos" },
   { route: "/repos/[repoId]/scans", tab: "repos" },
+  { route: "/repos/[repoId]/settings", tab: "repos" },
   { route: "/settings", tab: null },
 ];
 

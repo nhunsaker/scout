@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { RepoDetail, ScanSummary } from "@scoutui/web-shared";
 import { RepoDetailHeader } from "@/components/repos/repo-detail-header";
-
-vi.mock("@/app/repos/repo-actions", () => ({ deleteRepo: vi.fn() }));
 
 function makeDetail(overrides?: Partial<RepoDetail>): RepoDetail {
   return {
@@ -135,10 +133,10 @@ describe("RepoDetailHeader package count", () => {
 });
 
 describe("RepoDetailHeader repo actions", () => {
-  it("shows the repo actions menu to someone who can manage repos and to nobody else", () => {
-    const { rerender } = render(<RepoDetailHeader detail={makeDetail()} recentScans={[]} canManage />);
+  it("shows the repo actions menu to someone who can open the repo's settings and to nobody else", () => {
+    const { rerender } = render(<RepoDetailHeader detail={makeDetail()} recentScans={[]} canOpenSettings />);
     expect(screen.getByRole("button", { name: "Repo actions" })).toBeInTheDocument();
-    rerender(<RepoDetailHeader detail={makeDetail()} recentScans={[]} canManage={false} />);
+    rerender(<RepoDetailHeader detail={makeDetail()} recentScans={[]} canOpenSettings={false} />);
     expect(screen.queryByRole("button", { name: "Repo actions" })).toBeNull();
   });
 });

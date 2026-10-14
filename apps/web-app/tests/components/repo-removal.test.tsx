@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 const actions = vi.hoisted(() => ({ removeScan: vi.fn(), deleteRepo: vi.fn() }));
 vi.mock("@/app/repos/repo-actions", () => actions);
 
-import { RepoActionsMenu } from "@/components/repos/repo-actions-menu";
+import { DeleteRepoSection } from "@/components/repos/repo-settings";
 import { ScanRowActions } from "@/components/repos/scan-row-actions";
 
 const viewScan = <a href="/repos/web-app">View scan</a>;
@@ -25,15 +25,15 @@ afterEach(() => {
   actions.deleteRepo.mockReset();
 });
 
-describe("RepoActionsMenu", () => {
+describe("DeleteRepoSection", () => {
   it("enables Delete repo only once the repo's name is typed exactly, then deletes the repo", async () => {
     actions.deleteRepo.mockResolvedValue(undefined);
-    render(<RepoActionsMenu repoId="web-app" scanCount={5} />);
-    await choose("Repo actions", "Delete repo…");
+    render(<DeleteRepoSection repoId="web-app" scanCount={5} hasToken={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete repo…" }));
 
     expect(await dialogTitle()).toBe("Delete web-app?");
     expect(screen.getByRole("dialog")).toHaveAccessibleDescription(
-      "This deletes the repo and its 5 scans. It comes back the next time a scan of it is uploaded.",
+      "This deletes the repo and its 5 scans. It comes back the next time someone uploads a scan of it.",
     );
     const confirm = screen.getByRole("textbox", { name: "Type web-app to confirm" });
     const deleteButton = screen.getByRole("button", { name: "Delete repo" });
@@ -51,11 +51,11 @@ describe("RepoActionsMenu", () => {
 
   it("says one scan in the singular and shows why a delete failed", async () => {
     actions.deleteRepo.mockResolvedValue({ ok: false, error: "Couldn't delete the repo. Try again." });
-    render(<RepoActionsMenu repoId="web-app" scanCount={1} />);
-    await choose("Repo actions", "Delete repo…");
+    render(<DeleteRepoSection repoId="web-app" scanCount={1} hasToken={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete repo…" }));
 
     expect(await screen.findByRole("dialog")).toHaveAccessibleDescription(
-      "This deletes the repo and its 1 scan. It comes back the next time a scan of it is uploaded.",
+      "This deletes the repo and its 1 scan. It comes back the next time someone uploads a scan of it.",
     );
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "web-app" } });
     fireEvent.click(screen.getByRole("button", { name: "Delete repo" }));

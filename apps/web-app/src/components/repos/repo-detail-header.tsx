@@ -19,11 +19,11 @@ const META_LINK =
 export function RepoDetailHeader({
   detail,
   recentScans,
-  canManage = false,
+  canOpenSettings = false,
 }: {
   detail: RepoDetail;
   recentScans: ScanSummary[];
-  canManage?: boolean;
+  canOpenSettings?: boolean;
 }) {
   const remote = parseGitRemote(detail.gitRemote);
   const commitHref = commitUrl(detail.gitRemote, detail.commit);
@@ -40,7 +40,7 @@ export function RepoDetailHeader({
         </Link>
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-mono text-2xl font-semibold">{detail.repoId}</h1>
-          {canManage ? <RepoActionsMenu repoId={detail.repoId} scanCount={detail.scanCount} /> : null}
+          {canOpenSettings ? <RepoActionsMenu repoId={detail.repoId} /> : null}
         </div>
         {/* Each item leads with its separator, and the row starts one separator's
             width to the left, so the clip hides the separator at the start of a line. */}
