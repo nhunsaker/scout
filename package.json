@@ -33,7 +33,9 @@
   "resolutions": {
     "@docusaurus/core/tinypool": "^2.1.2",
     "@esbuild-kit/core-utils/esbuild": "0.25.12",
+    "istanbul-lib-processinfo/uuid": "^11.1.1",
     "next/postcss": "8.5.28",
+    "postcss-selector-parser": "^7.1.6",
     "serialize-javascript": "^7.0.5",
     "sockjs/uuid": "^11.1.1"
   }
