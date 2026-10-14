@@ -18,7 +18,7 @@ vi.mock("@/lib/identity", () => ({
   identify: vi.fn(async (caller: Caller): Promise<Identity | null> => {
     if ("browser" in caller) return session.value;
     if (caller.bearer === "Bearer user-token") return editor;
-    if (caller.bearer === "Bearer ci-token") return { kind: "ci" };
+    if (caller.bearer === "Bearer repo-token") return { kind: "repo-token", repoId: "repo-a" };
     return null;
   }),
 }));
@@ -134,10 +134,10 @@ describe.skipIf(!databaseUrl)("GET /api/scans/uploads/[uploadId]", { timeout: 30
     expect((await status(uploadId, "Bearer expired")).status).toBe(401);
   });
 
-  it("accepts a user bearer, the CI bearer and a browser session", async () => {
+  it("accepts a user bearer, a repo token and a browser session", async () => {
     const uploadId = await receiveArtifact(pool, sampleArtifact());
     expect((await status(uploadId, "Bearer user-token")).status).toBe(200);
-    expect((await status(uploadId, "Bearer ci-token")).status).toBe(200);
+    expect((await status(uploadId, "Bearer repo-token")).status).toBe(200);
     session.value = editor;
     const browser = await status(uploadId, null);
     expect(browser.status).toBe(200);

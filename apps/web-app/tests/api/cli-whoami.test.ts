@@ -12,7 +12,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("GET /api/auth/cli/whoami", () => {
   it.each([
     ["nobody", null],
-    ["the CI upload secret", { kind: "ci" as const }],
+    ["a repo token", { kind: "repo-token" as const, repoId: "repo-a" }],
   ])("returns 401 for %s", async (_, identity) => {
     vi.mocked(identify).mockResolvedValueOnce(identity);
     const req = new Request("http://x/api/auth/cli/whoami");

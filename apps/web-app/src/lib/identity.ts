@@ -1,22 +1,14 @@
-import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { cache } from "react";
 import { auth } from "@/auth";
-import { getDb, schema } from "@/db/client";
+import { getDb, getPool, schema } from "@/db/client";
 import { adminSettings, can, EDIT_REFUSAL, type Identity, type Person, personIdentity } from "@/lib/access";
+import { withCredentialStoreError } from "@/lib/cli-credential-store-errors";
 import { resolveCliSession } from "@/lib/cli-session-store";
+import { isRepoUploadToken, uploadTokenRepo } from "@/lib/repo-upload-tokens";
 
 /** A request's credentials: the browser's session cookie, or an `Authorization` header. */
 export type Caller = { browser: true } | { bearer: string | null };
-
-function ciTokenMatches(token: string): boolean {
-  // biome-ignore lint/complexity/useLiteralKeys: env access
-  const expected = process.env["SCOUTUI_CI_UPLOAD_TOKEN"];
-  if (!expected) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 async function loadPerson(userId: string): Promise<Person | null> {
   const row = await getDb().query.users.findFirst({
@@ -36,7 +28,10 @@ export async function identify(caller: Caller): Promise<Identity | null> {
   if ("browser" in caller) return browserIdentity();
   if (!caller.bearer?.startsWith("Bearer ")) return null;
   const token = caller.bearer.slice("Bearer ".length);
-  if (ciTokenMatches(token)) return { kind: "ci" };
+  if (isRepoUploadToken(token)) {
+    const repoId = await withCredentialStoreError(() => uploadTokenRepo(getPool(), token));
+    return repoId === null ? null : { kind: "repo-token", repoId };
+  }
   const session = await resolveCliSession(token);
   return session ? loadPerson(session.userId) : null;
 }

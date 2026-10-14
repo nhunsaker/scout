@@ -10,6 +10,7 @@ import { type Role, UPLOAD_REFUSAL } from "@/lib/access";
 import { consumeApprovedDeviceCode } from "@/lib/cli-session-store";
 import { hashToken } from "@/lib/cli-session-tokens";
 import { resetRateLimitState } from "@/lib/rate-limit";
+import { createUploadToken, regenerateUploadToken, revokeUploadToken } from "@/lib/repo-upload-tokens";
 import { insertPerson } from "../helpers/people";
 import { openReadModelDatabase } from "../helpers/read-model-db";
 import { receiveArtifact, sampleArtifact } from "../helpers/scan-artifact";
@@ -19,7 +20,6 @@ vi.mock("@/auth", () => ({ auth: vi.fn(async () => session.current) }));
 
 // biome-ignore lint/complexity/useLiteralKeys: env access
 const RUN_DB = process.env["DATABASE_URL"] != null;
-const CI_SECRET = "ci-secret-1234";
 
 const check = {
   repoId: "acme/web", remote: null, scanner: "@scoutui/cli", scannerVersion: "0.10.0", schemaVersion: SCHEMA_VERSION, rescan: false,
@@ -64,8 +64,16 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     return (await consumeApprovedDeviceCode(deviceId, userId))?.token ?? "";
   }
 
-  async function bearer(who: Role | "ci"): Promise<string> {
-    if (who === "ci") return CI_SECRET;
+  /** Puts `repoId` on the dashboard if it isn't, gives it a CI upload token and returns the token. */
+  async function repoToken(repoId: string): Promise<string> {
+    await pool.query("INSERT INTO repos (repo_id) VALUES ($1) ON CONFLICT DO NOTHING", [repoId]);
+    const created = await createUploadToken(pool, "ana@example.com", repoId);
+    if (!created.ok) throw new Error(created.error);
+    return created.token;
+  }
+
+  async function bearer(who: Role | "token"): Promise<string> {
+    if (who === "token") return repoToken("repo-a");
     return cliToken(await insertPerson(pool, { email: `${who}@example.com`, role: who }));
   }
 
@@ -83,7 +91,6 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     vi.stubEnv("DATABASE_URL", pool.options.connectionString);
     vi.stubEnv("SCOUTUI_ADMINS", undefined);
     vi.stubEnv("SCOUTUI_ADMIN_GROUP", undefined);
-    vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", CI_SECRET);
     session.current = null;
     resetRateLimitState();
   });
@@ -102,7 +109,7 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
   it.each([
     { who: "a Viewer", as: "viewer" as const, status: 403, refusal: UPLOAD_REFUSAL, pulled: false, stored: 0 },
     { who: "an Editor", as: "editor" as const, status: 202, refusal: undefined, pulled: true, stored: 1 },
-    { who: "the CI upload secret", as: "ci" as const, status: 202, refusal: undefined, pulled: true, stored: 1 },
+    { who: "a repo's CI upload token", as: "token" as const, status: 202, refusal: undefined, pulled: true, stored: 1 },
   ])("answers an upload from $who with $status, and reads its body: $pulled", async ({ as, status, refusal, pulled, stored }) => {
     const body = watchedBody("{}");
     const response = await upload(post("/api/scans", await bearer(as), body.stream));
@@ -139,6 +146,26 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     expect((await upload(post("/api/scans", token, "{}"))).status).toBe(401);
   });
 
+  it("refuses a regenerated token's old value and takes the new one", async () => {
+    const old = await repoToken("repo-a");
+    const regenerated = await regenerateUploadToken(pool, "bo@example.com", "repo-a");
+    if (!regenerated.ok) throw new Error(regenerated.error);
+    expect((await upload(post("/api/scans", old, "{}"))).status).toBe(401);
+    expect((await upload(post("/api/scans", regenerated.token, "{}"))).status).toBe(202);
+  });
+
+  it("refuses a revoked token", async () => {
+    const token = await repoToken("repo-a");
+    expect((await upload(post("/api/scans", token, "{}"))).status).toBe(202);
+    await revokeUploadToken(pool, "repo-a");
+    expect((await upload(post("/api/scans", token, "{}"))).status).toBe(401);
+  });
+
+  it("no longer takes uploads with SCOUTUI_CI_UPLOAD_TOKEN", async () => {
+    vi.stubEnv("SCOUTUI_CI_UPLOAD_TOKEN", "ci-secret-1234");
+    expect((await upload(post("/api/scans", "ci-secret-1234", "{}"))).status).toBe(401);
+  });
+
   it("refuses an upload and a pre-scan check that bring only an Editor's browser session, which can still read an upload's status", async () => {
     session.current = { user: { id: await insertPerson(pool, { email: "ana@example.com", role: "editor" }) } };
     const uploadId = await receiveArtifact(pool, sampleArtifact());
@@ -152,7 +179,7 @@ describe.skipIf(!RUN_DB)("who may upload scans, against PostgreSQL", () => {
     const statusOf = async (token: string | null) =>
       (await uploadStatus(get(`/api/scans/uploads/${uploadId}`, token), { params: Promise.resolve({ uploadId }) })).status;
     expect(await statusOf(await bearer("viewer"))).toBe(200);
-    expect(await statusOf(CI_SECRET)).toBe(200);
+    expect(await statusOf(await repoToken("repo-a"))).toBe(200);
     expect(await statusOf(null)).toBe(401);
   });
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/identity", () => ({
   identify: vi.fn(async ({ bearer }: { bearer: string | null }) => {
-    if (bearer === "Bearer ci") return { kind: "ci" as const };
+    if (bearer?.startsWith("Bearer repo-")) return { kind: "repo-token" as const, repoId: bearer.slice("Bearer ".length) };
     return { kind: "person" as const, userId: bearer?.slice("Bearer ".length) ?? "u1", email: "ana@example.com", name: null, role: "editor" as const, roleSource: "people" as const };
   }),
 }));
@@ -91,17 +91,17 @@ describe("POST /api/scans rate limiting", () => {
     warn.mockRestore();
   });
 
-  it("buckets CI-token uploads per client address", async () => {
+  it("buckets a repo token's uploads per repo", async () => {
     const POST = await loadRoute();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     for (let i = 0; i < 30; i++) {
-      await POST(post("{}", { "X-Forwarded-For": "203.0.113.1", Authorization: "Bearer ci" }));
+      await POST(post("{}", { "X-Forwarded-For": "203.0.113.1", Authorization: "Bearer repo-a" }));
     }
-    const same = await POST(post("{}", { "X-Forwarded-For": "203.0.113.1", Authorization: "Bearer ci" }));
-    expect(same.status).toBe(429);
-    expect(warn).toHaveBeenCalledWith("[rate-limit] rejected route=scans key=scans:ci:203.0.113.1");
-    const other = await POST(post("{}", { "X-Forwarded-For": "203.0.113.2", Authorization: "Bearer ci" }));
-    expect(other.status).toBe(202);
+    const otherAddress = await POST(post("{}", { "X-Forwarded-For": "203.0.113.2", Authorization: "Bearer repo-a" }));
+    expect(otherAddress.status).toBe(429);
+    expect(warn).toHaveBeenCalledWith("[rate-limit] rejected route=scans key=scans:repo:repo-a");
+    const otherRepo = await POST(post("{}", { "X-Forwarded-For": "203.0.113.1", Authorization: "Bearer repo-b" }));
+    expect(otherRepo.status).toBe(202);
     warn.mockRestore();
   });
 });
@@ -124,21 +124,21 @@ describe("POST /api/scans/preflight rate limiting", () => {
     warn.mockRestore();
   });
 
-  it("buckets CI-token pre-scan checks per client address", async () => {
+  it("buckets a repo token's pre-scan checks per repo", async () => {
     await loadRoute();
     const { POST: preflight } = await import("@/app/api/scans/preflight/route");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const check = (address: string) => preflight(new Request("http://x/api/scans/preflight", {
-      method: "POST", headers: { "X-Forwarded-For": address, Authorization: "Bearer ci" }, body: "{}",
+    const check = (address: string, repoId: string) => preflight(new Request("http://x/api/scans/preflight", {
+      method: "POST", headers: { "X-Forwarded-For": address, Authorization: `Bearer ${repoId}` }, body: "{}",
     }));
     for (let i = 0; i < 30; i++) {
-      await check("203.0.113.1");
+      await check("203.0.113.1", "repo-a");
     }
-    const same = await check("203.0.113.1");
-    expect(same.status).toBe(429);
-    expect(warn).toHaveBeenCalledWith("[rate-limit] rejected route=preflight key=preflight:ci:203.0.113.1");
-    const other = await check("203.0.113.2");
-    expect(other.status).toBe(400);
+    const otherAddress = await check("203.0.113.2", "repo-a");
+    expect(otherAddress.status).toBe(429);
+    expect(warn).toHaveBeenCalledWith("[rate-limit] rejected route=preflight key=preflight:repo:repo-a");
+    const otherRepo = await check("203.0.113.1", "repo-b");
+    expect(otherRepo.status).toBe(400);
     warn.mockRestore();
   });
 });

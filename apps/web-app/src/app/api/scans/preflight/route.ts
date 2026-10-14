@@ -5,7 +5,7 @@ import { can, UPLOAD_REFUSAL } from "@/lib/access";
 import { builtWithCli } from "@/lib/built-with-cli";
 import { dashboardWarning } from "@/lib/dashboard-warning";
 import { identify } from "@/lib/identity";
-import { rateLimit, clientKey, logRateLimitRejection } from "@/lib/rate-limit";
+import { rateLimit, logRateLimitRejection } from "@/lib/rate-limit";
 import { repoIdentityRefusal } from "@/lib/repo-identity";
 import { readJsonBody } from "@/lib/request-body";
 import { acceptScan, commitDecision, SCAN_FORMATS, storedScans } from "@/lib/scan-acceptance";
@@ -46,7 +46,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ refusal: UPLOAD_REFUSAL, commits: [], warning: dashboardWarning(), scanFormats: SCAN_FORMATS });
   }
 
-  const key = identity.kind === "ci" ? `preflight:ci:${clientKey(req)}` : `preflight:user:${identity.userId}`;
+  const key = identity.kind === "repo-token" ? `preflight:repo:${identity.repoId}` : `preflight:user:${identity.userId}`;
   const limited = rateLimit(key, PREFLIGHT_LIMIT, PREFLIGHT_WINDOW_MS);
   if (!limited.ok) {
     logRateLimitRejection("preflight", key);

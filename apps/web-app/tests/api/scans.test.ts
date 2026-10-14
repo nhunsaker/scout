@@ -180,7 +180,7 @@ describe.skipIf(!databaseUrl)("POST /api/scans reception", { timeout: 30_000 }, 
   });
 
   it("records a CI upload without a user", async () => {
-    identity.value = { kind: "ci" };
+    identity.value = { kind: "repo-token", repoId: "repo-a" };
     expect((await POST(request(Buffer.from("{}")))).status).toBe(202);
     expect((await pool.query("SELECT uploaded_by_user_id FROM scan_uploads")).rows).toEqual([{ uploaded_by_user_id: null }]);
   });

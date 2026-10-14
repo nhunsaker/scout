@@ -6,8 +6,8 @@ export const ROLE_NAMES: Record<Role, string> = { viewer: "Viewer", editor: "Edi
 /** Where a person's role comes from: the People page, `SCOUTUI_ADMINS`, or `SCOUTUI_ADMIN_GROUP`. */
 export type RoleSource = "people" | "install" | "group";
 export type Person = { kind: "person"; userId: string; email: string; name: string | null; role: Role; roleSource: RoleSource };
-/** Who is asking, with their role as it stands for this request. `ci` is the install-wide upload secret. */
-export type Identity = Person | { kind: "ci" };
+/** Who is asking, with their role as it stands for this request. `repo-token` is a repo's CI upload token, which uploads only scans of `repoId`. */
+export type Identity = Person | { kind: "repo-token"; repoId: string };
 export type Action = "view" | "edit" | "upload" | "manage-people" | "manage-repos";
 /** The parts of a saved chart its access depends on. */
 export type ChartTarget = Pick<Dashboard, "createdByUserId" | "visibility">;
@@ -32,7 +32,7 @@ const NEEDS: Record<Exclude<Action, "view">, Role> = { edit: "editor", upload: "
  */
 export function can(identity: Identity | null, action: Action, target?: Target): boolean {
   if (identity === null) return false;
-  if (identity.kind === "ci") return action === "upload";
+  if (identity.kind === "repo-token") return action === "upload";
   const chart = target && "chart" in target ? target.chart : null;
   const ownsOrAdmin = chart === null || chart.createdByUserId === identity.userId || identity.role === "admin";
   if (action === "view") return chart?.visibility === "everyone" || ownsOrAdmin;
