@@ -41,7 +41,13 @@ jobs:
       - name: Scan and upload (${{ matrix.target }})
         env:
           SCOUTUI_HOST: ${{ secrets.SCOUTUI_HOST }}
-          SCOUTUI_TOKEN: ${{ secrets.SCOUTUI_UPLOAD_TOKEN }}
+          SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V14: ${{ matrix.target == 'pie-aperture' && secrets.SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V14 || '' }}
+          SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V15: ${{ matrix.target == 'pie-aperture' && secrets.SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V15 || '' }}
+          SCOUTUI_TOKEN_PIE_APERTURE_NUXT_APP: ${{ matrix.target == 'pie-aperture' && secrets.SCOUTUI_TOKEN_PIE_APERTURE_NUXT_APP || '' }}
+          SCOUTUI_TOKEN_CAL_DIY_WEB: ${{ matrix.target == 'cal.diy' && secrets.SCOUTUI_TOKEN_CAL_DIY_WEB || '' }}
+          SCOUTUI_TOKEN_ELK_ZONE_ELK: ${{ matrix.target == 'elk' && secrets.SCOUTUI_TOKEN_ELK_ZONE_ELK || '' }}
+          SCOUTUI_TOKEN_VUE_VBEN_ADMIN: ${{ matrix.target == 'vue-vben-admin' && secrets.SCOUTUI_TOKEN_VUE_VBEN_ADMIN || '' }}
+          SCOUTUI_TOKEN_PAYLOADCMS_PAYLOAD: ${{ matrix.target == 'payload' && secrets.SCOUTUI_TOKEN_PAYLOADCMS_PAYLOAD || '' }}
           RESCAN: ${{ inputs.rescan }}
         run: |
           args=(--target "$TARGET" --step scan --work-dir "$RUNNER_TEMP/consumer-ci")

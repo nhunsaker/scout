@@ -15,9 +15,9 @@ export const TARGETS: Target[] = [
     // auto-imports.
     install: "corepack yarn@3.8.1 install --immutable --mode=skip-build && corepack yarn@3.8.1 workspace nuxt-app run postinstall",
     scans: [
-      { cwd: "nextjs-app-v14", repoId: "pie-aperture/nextjs-app-v14", include: ["src/**/*.{ts,tsx,js,jsx}"] },
-      { cwd: "nextjs-app-v15", repoId: "pie-aperture/nextjs-app-v15", include: ["src/**/*.{ts,tsx,js,jsx}"] },
-      { cwd: "nuxt-app", repoId: "pie-aperture/nuxt-app", include: ["**/*.{ts,js,vue}"] },
+      { cwd: "nextjs-app-v14", repoId: "pie-aperture/nextjs-app-v14", include: ["src/**/*.{ts,tsx,js,jsx}"], tokenSecret: "SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V14" },
+      { cwd: "nextjs-app-v15", repoId: "pie-aperture/nextjs-app-v15", include: ["src/**/*.{ts,tsx,js,jsx}"], tokenSecret: "SCOUTUI_TOKEN_PIE_APERTURE_NEXTJS_APP_V15" },
+      { cwd: "nuxt-app", repoId: "pie-aperture/nuxt-app", include: ["**/*.{ts,js,vue}"], tokenSecret: "SCOUTUI_TOKEN_PIE_APERTURE_NUXT_APP" },
     ],
   },
   {
@@ -25,7 +25,7 @@ export const TARGETS: Target[] = [
     repo: "calcom/cal.diy",
     install: INSTALL,
     scans: [
-      { cwd: "apps/web", repoId: "cal.diy/web", include: ["**/*.{ts,tsx,js,jsx}"] },
+      { cwd: "apps/web", repoId: "cal.diy/web", include: ["**/*.{ts,tsx,js,jsx}"], tokenSecret: "SCOUTUI_TOKEN_CAL_DIY_WEB" },
     ],
   },
   {
@@ -39,6 +39,7 @@ export const TARGETS: Target[] = [
         cwd: ".",
         repoId: "elk-zone/elk",
         include: ["app/**/*.{ts,js,vue}"],
+        tokenSecret: "SCOUTUI_TOKEN_ELK_ZONE_ELK",
       },
     ],
   },
@@ -57,6 +58,7 @@ export const TARGETS: Target[] = [
         repoId: "vue-vben-admin",
         // apps/backend-mock has no .ts/.tsx/.vue under src/, so the glob skips it.
         include: ["apps/**/src/**/*.{ts,tsx,vue}", "packages/**/src/**/*.{ts,tsx,vue}"],
+        tokenSecret: "SCOUTUI_TOKEN_VUE_VBEN_ADMIN",
       },
     ],
   },
@@ -75,6 +77,7 @@ export const TARGETS: Target[] = [
         // Leaves out `test/` and `templates/` (e2e fixture apps and starter
         // templates), so counts reflect the admin UI.
         include: ["packages/ui/src/**/*.{ts,tsx}", "packages/richtext-lexical/src/**/*.{ts,tsx}"],
+        tokenSecret: "SCOUTUI_TOKEN_PAYLOADCMS_PAYLOAD",
       },
     ],
   },

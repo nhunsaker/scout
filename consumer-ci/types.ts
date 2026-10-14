@@ -9,6 +9,8 @@ export interface ScanSpec {
   repoId: string;
   /** Include globs for this app (React and Vue source patterns differ). */
   include: string[];
+  /** The environment variable, a repo secret of the same name in CI, holding this repo's CI upload token. */
+  tokenSecret: string;
   /** Optional: tsconfig (relative to the app dir) to pull `paths` aliases from. */
   tsconfigPath?: string;
   /** Optional: inline alias map (relative to the app dir), layered ahead of Node resolution. */

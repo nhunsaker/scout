@@ -32,6 +32,11 @@ export function scanArgs(configPath: string, host?: string, rescan = false): str
   return args;
 }
 
+/** `env` for one scan, with SCOUTUI_TOKEN set to that scan's own token. */
+export function scanEnv(scan: ScanSpec, env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { ...env, SCOUTUI_TOKEN: env[scan.tokenSecret] ?? "" };
+}
+
 /** Result of one app-dir scan: failure reasons (empty = passed). */
 export interface ScanResult {
   repoId: string;
@@ -81,7 +86,7 @@ export async function runTarget(
       const { SCOUTUI_HOST: host } = process.env;
       const { exitCode } = await execa("node", [cliBin, ...scanArgs(configPath, host, rescan)], {
         cwd: appDir,
-        env,
+        env: scanEnv(scan, env),
         stdio: "inherit",
         reject: false,
       });
