@@ -17,7 +17,7 @@ Before you start:
 
 On the dashboard, open the repo's page and press **⋯**, then **Settings**, then **Create token**. Press **Copy**, and in the repo's GitHub settings add the token as an Actions secret named `SCOUTUI_TOKEN`. Then press **Done**.
 
-The token is shown only once. **Regenerate** replaces it, and **Revoke** removes it.
+The token is shown only once. If you lose it, or the repo already has one, press **Regenerate** for a new one.
 
 ## 2. Add the workflow
 
