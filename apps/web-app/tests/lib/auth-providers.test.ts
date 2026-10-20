@@ -51,10 +51,15 @@ describe("buildProviders", () => {
     expect(kinds(providers)).toEqual(["oidc"]);
   });
 
-  it("requests only the scopes needed for browser sign-in", () => {
-    const [provider] = buildProviders({ NODE_ENV: "production", ...OIDC });
+  it.each([
+    { extra: undefined, scope: "openid profile email" },
+    { extra: "groups", scope: "openid profile email groups" },
+    { extra: " groups\toffline_access ", scope: "openid profile email groups offline_access" },
+    { extra: "openid groups email", scope: "openid profile email groups" },
+  ])("requests openid, profile and email, plus OIDC_EXTRA_SCOPES=$extra", ({ extra, scope }) => {
+    const [provider] = buildProviders({ NODE_ENV: "production", ...OIDC, OIDC_EXTRA_SCOPES: extra });
     expect(provider).toMatchObject({
-      authorization: { params: { scope: "openid profile email" } },
+      authorization: { params: { scope } },
     });
   });
 

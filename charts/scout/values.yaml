@@ -142,6 +142,9 @@ auth:
       key: OIDC_CLIENT_SECRET
     # Optional comma-separated allow-list of email domains.
     allowedDomains: ""
+    # Optional scopes to ask for on top of openid, profile and email, such as
+    # groups for a provider that sends groups only when asked (Okta does).
+    extraScopes: []
   # Set at least one. Emails of people who are always Admins; each counts only
   # when the sign-in provider marks it verified.
   admins: []

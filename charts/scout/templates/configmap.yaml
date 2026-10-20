@@ -13,6 +13,9 @@ data:
   {{- with .Values.auth.oidc.allowedDomains }}
   OIDC_ALLOWED_DOMAINS: {{ . | quote }}
   {{- end }}
+  {{- with .Values.auth.oidc.extraScopes }}
+  OIDC_EXTRA_SCOPES: {{ join " " . | quote }}
+  {{- end }}
   {{- with .Values.auth.admins }}
   SCOUTUI_ADMINS: {{ join "," . | quote }}
   {{- end }}

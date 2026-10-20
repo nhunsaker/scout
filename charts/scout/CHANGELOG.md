@@ -1,5 +1,9 @@
 # scout chart
 
+## 0.9.0
+
+- New: `auth.oidc.extraScopes`, scopes for the dashboard to ask your sign-in provider for on top of `openid`, `profile` and `email`. Set it to `[groups]` when your provider sends groups only when asked, as Okta does, so `auth.adminGroup` works. It takes effect from web app 0.7.0.
+
 ## 0.8.0
 
 - Run web app 0.6.0 by default.

@@ -18,6 +18,17 @@ function requiredEnv(env: Record<string, string | undefined>, name: string): str
 }
 
 /**
+ * The scopes browser sign-in asks the provider for: `openid profile email`, plus
+ * the space-separated scopes in `OIDC_EXTRA_SCOPES`, such as `groups` for a
+ * provider that sends groups only when asked.
+ */
+function oidcScopes(env: Record<string, string | undefined>): string {
+  // biome-ignore lint/complexity/useLiteralKeys: env access
+  const extra = (env["OIDC_EXTRA_SCOPES"] ?? "").split(/\s+/).filter(s => s !== "");
+  return [...new Set(["openid", "profile", "email", ...extra])].join(" ");
+}
+
+/**
  * Whether the local dev sign-in bypass is active: an email and password form
  * that skips OIDC. Needs both `NODE_ENV=development` and a non-empty
  * `DEV_AUTH_PASSWORD`, so it can't activate in a production build.
@@ -53,7 +64,7 @@ export function buildProviders(env: Record<string, string | undefined> = process
       issuer: requiredEnv(env, "OIDC_ISSUER_URL"),
       clientId: requiredEnv(env, "OIDC_CLIENT_ID"),
       clientSecret: requiredEnv(env, "OIDC_CLIENT_SECRET"),
-      authorization: { params: { scope: "openid profile email" } },
+      authorization: { params: { scope: oidcScopes(env) } },
       // Auth.js v5 handles OIDC discovery, PKCE, and token exchange automatically
       // when type: "oidc" + issuer is set.
     });

@@ -23,6 +23,7 @@ Before you upgrade, read the entries in [`CHANGELOG.md`](CHANGELOG.md) newer tha
 | `ingress` | How traffic reaches the web server |
 | `postgresql.enabled` or `database.host` | The bundled Postgres, or your own |
 | `auth.oidc.allowedDomains` | Which email domains may sign in, when your provider doesn't decide that itself |
+| `auth.oidc.extraScopes` | Scopes to ask your provider for on top of `openid`, `profile` and `email`, such as `groups` when it sends groups only when asked |
 
 [`values.yaml`](values.yaml) lists every value with its default.
 
