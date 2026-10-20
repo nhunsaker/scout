@@ -74,6 +74,7 @@ Optional settings on the web server:
 | Variable | What it's for |
 | --- | --- |
 | `OIDC_ALLOWED_DOMAINS` | Which email domains may sign in. See [Restrict who can sign in](/docs/guides/deploy-the-dashboard#restrict-who-can-sign-in), where it appears as `auth.oidc.allowedDomains`. |
+| `OIDC_EXTRA_SCOPES` | Scopes to ask your provider for on top of `openid profile email`, separated by spaces, such as `groups`. See [By group](/docs/guides/manage-people-and-roles#by-group). |
 | `SCOUTUI_TRUSTED_PROXY_HOPS` | The number of proxies in front of the dashboard. See [step 6](#6-configure-the-ingress-or-proxy). |
 | `DATABASE_POOL_MAX` | Database connections per web server pod. Default 10. |
 

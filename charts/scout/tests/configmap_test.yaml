@@ -31,6 +31,8 @@ tests:
       - notExists:
           path: data.OIDC_ALLOWED_DOMAINS
       - notExists:
+          path: data.OIDC_EXTRA_SCOPES
+      - notExists:
           path: data.SCOUTUI_ADMINS
       - notExists:
           path: data.SCOUTUI_ADMIN_GROUP
@@ -47,6 +49,19 @@ tests:
       - equal:
           path: data.OIDC_ALLOWED_DOMAINS
           value: "example.org,example.com"
+
+  - it: joins extra scopes with spaces
+    set:
+      auth:
+        url: "https://scout.example.com"
+        oidc:
+          issuerUrl: "https://auth.example.com/application/o/scout/"
+          clientId: "scout"
+          extraScopes: [groups, offline_access]
+    asserts:
+      - equal:
+          path: data.OIDC_EXTRA_SCOPES
+          value: "groups offline_access"
 
   - it: joins admin emails with commas
     set:

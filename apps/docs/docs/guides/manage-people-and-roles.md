@@ -49,6 +49,19 @@ With your own chart, set `SCOUTUI_ADMIN_GROUP` on the web server to the group's 
 
 Members of the group are Admins. The dashboard reads a person's groups from the `groups` field of the provider's userinfo response, so the provider must include that field for the scopes in [step 1 of Deploy the dashboard](/docs/guides/deploy-the-dashboard#1-register-the-dashboard-with-your-identity-provider).
 
+Some providers, such as Okta, send groups only when the dashboard asks for the `groups` scope. For those, ask for it as well:
+
+```yaml title="values.yaml"
+auth:
+  adminGroup: scout-admins
+  oidc:
+    extraScopes: [groups]
+```
+
+With your own chart, also set `OIDC_EXTRA_SCOPES` on the web server to `groups`. Add it only if your provider needs it: some providers, such as Google, turn sign-in away when the dashboard asks for a scope they don't know.
+
+In Okta, also add a groups claim to the dashboard's application. On its **Sign On** tab, edit **OpenID Connect ID Token**, set **Groups claim type** to **Filter**, keep the claim name `groups`, and choose a filter that matches the admin group, such as **Equals** `scout-admins`.
+
 The dashboard checks the group each time someone signs in to it in a browser. Someone you add to the group becomes an Admin at their next browser sign-in. Someone you take out of it stops being one at their next browser sign-in, or straight away if an Admin also [removes them](#remove-someone) on **People**.
 
 ### If someone you named isn't an Admin {#if-someone-you-named-isnt-an-admin}
