@@ -1,5 +1,11 @@
 # @scoutui/web-app
 
+## 0.7.0
+
+### Minor Changes
+
+- [#157](https://github.com/scoutui/scout/pull/157) [`15223e1`](https://github.com/scoutui/scout/commit/15223e1e922c53b83d948df378440ec59b777b45) Thanks [@siggerzz](https://github.com/siggerzz)! - New: `OIDC_EXTRA_SCOPES`, scopes for the dashboard to ask your sign-in provider for on top of `openid profile email`, separated by spaces. Set it to `groups` when your provider sends groups only when asked, as Okta does, so `SCOUTUI_ADMIN_GROUP` works. With the Helm chart, set `auth.oidc.extraScopes`.
+
 ## 0.6.0
 
 ### Minor Changes
