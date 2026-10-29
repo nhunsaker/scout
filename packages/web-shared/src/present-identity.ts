@@ -1,4 +1,4 @@
-import type { Component, EvidenceRecord } from "@scoutui/scan-format";
+import type { Component, EvidenceRecord, Framework } from "@scoutui/scan-format";
 
 /** The component fields identity presentation reads; a full `Component` and a stored `ComponentDigest` both satisfy it. */
 export type PresentableComponent = Pick<Component, "identity" | "framework" | "attribution" | "owningPackage">;
@@ -19,9 +19,13 @@ export type Presented = {
 /** Evidence sources that define a custom element: a CEM declaration, or a `customElements.define` registration. */
 const DEFINES_ELEMENT: ReadonlySet<EvidenceRecord["source"]> = new Set(["cem", "registration"]);
 
+/** The UI kind for each framework a component can carry. A framework added to the scan format fails to compile here until it has a kind. */
+const FRAMEWORK_KIND: Record<Framework, Presented["kind"]> = { react: "react-component", vue: "vue-component" };
+
 export function presentIdentity(component: PresentableComponent): Presented {
   const { identity } = component;
-  const frameworkKind = component.framework === "vue" ? "vue-component" : "react-component";
+  // A component without a framework presents as React.
+  const frameworkKind = component.framework === undefined ? "react-component" : FRAMEWORK_KIND[component.framework];
   switch (identity.kind) {
     case "package-export":
       return {
