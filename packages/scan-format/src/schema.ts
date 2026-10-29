@@ -72,7 +72,7 @@ const identitySchema = z.discriminatedUnion("kind", [
 ]);
 export type Identity = z.infer<typeof identitySchema>;
 
-const frameworkSchema = z.enum(["react", "vue"]);
+const frameworkSchema = z.enum(["react", "vue", "angular"]);
 export type Framework = z.infer<typeof frameworkSchema>;
 
 const creditSchema = openKinds(

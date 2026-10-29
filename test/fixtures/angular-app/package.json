@@ -1,0 +1,13 @@
+{
+  "name": "angular-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@angular/core": "^21.0.0",
+    "@angular/compiler": "^21.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -64,7 +64,14 @@ export type TagUsage = {
 /** Source-file dialect understood by the engine. Drives the default
  *  identity kind for occurrences whose resolution doesn't find a concrete
  *  manifest entry. */
-export type Dialect = "react" | "vue";
+export type Dialect = "react" | "vue" | "angular";
+
+/** A dialect whose components come from a template, not from JSX in the
+ *  file's own code: the parser declares each component itself, so the
+ *  registry's React shape rules don't judge it. */
+export function isTemplateDialect(dialect: Dialect): boolean {
+  return dialect !== "react";
+}
 
 /** Discriminator for shared `ownership[i]` entries: whether the entry
  *  references a `jsxUsages[i]` (symbol-resolved) or `tagUsages[i]`

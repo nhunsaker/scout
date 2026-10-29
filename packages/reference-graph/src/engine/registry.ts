@@ -1,5 +1,5 @@
 import type { BindingDecl, FileGraph, Graph, InferredType, Reference } from "../index.js";
-import { MODULE_SCOPE } from "../index.js";
+import { isTemplateDialect, MODULE_SCOPE } from "../index.js";
 import { parseCompoundExport } from "@scoutui/scan-format";
 import { bindingDeclaration, isDefaultExport, resolveBinding } from "./binding.js";
 import { createCycleGuard } from "./cycle-detection.js";
@@ -42,7 +42,7 @@ export type RegistryEntry = {
   filePath: string;
   symbol: string;
   exportName: string;
-  kind: "react-component" | "vue-component";
+  kind: "react-component" | "vue-component" | "angular-component";
   loc: { line: number; column: number };
   isDefault: boolean;
 };
@@ -141,7 +141,7 @@ export function buildComponentRegistry(graph: Graph, tagged: Iterable<BindingDec
   const entries: RegistryEntry[] = [];
   const taggedEntries = new Set<string>();
   for (const [file, fg] of graph.files) {
-    if (fg.dialect === "vue") continue;
+    if (isTemplateDialect(fg.dialect)) continue;
     for (const decl of fg.declarations.values()) {
       const symbolKey = entryKey(file, decl.symbol);
       if (!renderedAsTag.has(decl) && !(consumed.has(symbolKey) && isAdmittedShape(decl.value, graph, fg))) continue;
@@ -183,7 +183,7 @@ export function buildComponentRegistry(graph: Graph, tagged: Iterable<BindingDec
   const judgedByName = new Map<string, boolean>();
   const isComponent = (filePath: string, name: string, declaration?: BindingDecl): boolean => {
     const fg = graph.files.get(filePath);
-    if (fg === undefined || fg.dialect === "vue") return false;
+    if (fg === undefined || isTemplateDialect(fg.dialect)) return false;
     if (declaration !== undefined) return judge(fg, name, declaration);
     const cacheKey = entryKey(filePath, name);
     const cached = judgedByName.get(cacheKey);
@@ -212,7 +212,7 @@ export function declarationOf(
   exportName: string,
 ): { symbol: string; loc: { line: number; column: number } } | undefined {
   const fg = graph.files.get(filePath);
-  if (fg === undefined || fg.dialect === "vue") return undefined;
+  if (fg === undefined || isTemplateDialect(fg.dialect)) return undefined;
   const { root, isCompound } = parseCompoundExport(exportName);
   if (isCompound) return undefined;
   const decl = findDeclaration(fg, root);

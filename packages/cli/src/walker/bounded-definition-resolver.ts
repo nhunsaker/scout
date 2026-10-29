@@ -28,6 +28,7 @@ import {
   followReExportChain,
 } from "@scoutui/reference-graph";
 import type { Graph, ResolveImport } from "@scoutui/reference-graph";
+import { isTemplateDialect } from "@scoutui/reference-graph";
 import { emitReact } from "@scoutui/parser-react";
 import { parseByExt, type ParsedFile, type SyntaxErrorReporter } from "../parse-by-ext.js";
 import { emitVueFile } from "../emit-vue-file.js";
@@ -156,7 +157,8 @@ export function createBoundedDefinitionResolver(opts: {
     const pinned = pin(absTarget, imported, path);
     if (pinned === null || "specifier" in pinned) return pinned;
     const graph = shadowGraph();
-    if (graph.files.get(pinned.absFile)?.dialect === "vue") return pinned;
+    const dialect = graph.files.get(pinned.absFile)?.dialect;
+    if (dialect !== undefined && isTemplateDialect(dialect)) return pinned;
     const definition = declarationPositionIn(graph, pinned.absFile, pinned.exportName, pinned.path);
     return definition === undefined ? pinned : { ...pinned, definition };
   };

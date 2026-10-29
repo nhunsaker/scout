@@ -29,6 +29,8 @@ export type Classification = "component" | "helper" | "unknown";
 export function classifyDeclaration(decl: BindingDecl, registry: ComponentRegistry, fileGraph: FileGraph): Classification {
   if (decl.value.kind !== "Function" && decl.value.kind !== "ReturnTypeOf") return "unknown";
   if (fileGraph.dialect === "vue" && isDefaultExport(fileGraph, decl.symbol)) return "component";
+  // The Angular parser declares only component classes, so each one owns its template.
+  if (fileGraph.dialect === "angular") return "component";
   return registry.hasLocal(fileGraph.filePath, decl.symbol) ? "component" : "helper";
 }
 

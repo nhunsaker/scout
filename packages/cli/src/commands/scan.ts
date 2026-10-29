@@ -11,6 +11,8 @@ import { detectWebComponents } from "../local-index/detect-wc.js";
 import type { LocalDefinition } from "../local-index/types.js";
 import { isParsable, parseByExt, syntaxErrorWarning, type ParsedFile } from "../parse-by-ext.js";
 import { emitVueFile } from "../emit-vue-file.js";
+import { angularDefinitions, buildSelectorMatcher, emitAngularFile, importsOf, loadAngularCompiler, type PendingAngularFile } from "../emit-angular-file.js";
+import { detectAngularComponents } from "../local-index/detect-angular.js";
 import { createProgress, startPhase } from "../util/progress.js";
 import { DEFAULT_INCLUDE, excludeEntriesMatchingNothing, nestedRepositoriesMatched, walkFiles, type WalkOptions } from "../walker/files.js";
 import { createImportResolver } from "../walker/resolve-import.js";
@@ -487,6 +489,11 @@ export async function scanRepository(input: {
     }
   }
 
+  // Angular component files wait until every file's selectors are known: a
+  // template names its components by selector, not by import.
+  const angularCompiler = loadAngularCompiler(cfg.configDir);
+  const pendingAngular: PendingAngularFile[] = [];
+
   // ── Phase 1: read + parse + emit local definitions ──────────────────────
   let filesScanned = 0;
   for (const file of files) {
@@ -525,7 +532,14 @@ export async function scanRepository(input: {
       continue;
     }
     filesScanned++;
-    if (parsed.kind === "babel") {
+    const angularComponents =
+      parsed.kind === "babel" && angularCompiler !== null && source.includes("@Component")
+        ? detectAngularComponents(parsed.ast, source)
+        : [];
+    if (parsed.kind === "babel" && angularComponents.length > 0) {
+      localDefs.push(...angularDefinitions(angularComponents, outRel));
+      pendingAngular.push({ graphKey: relPath, absPath: file, source, components: angularComponents, imports: importsOf(parsed.ast as unknown as { body: unknown[] }) });
+    } else if (parsed.kind === "babel") {
       declaredByFile.set(outRel, extractReactDeclaredProps(parsed.ast));
       localDefs.push(...detectWebComponents(parsed.ast, source, outRel));
       // Script mode finds Vue `defineComponent` calls in plain .ts/.js files, as
@@ -558,6 +572,23 @@ export async function scanRepository(input: {
       }
     }
     parseProgress.tick();
+  }
+
+  if (angularCompiler !== null && pendingAngular.length > 0) {
+    const matcher = buildSelectorMatcher(angularCompiler, pendingAngular);
+    for (const pending of pendingAngular) {
+      try {
+        emitAngularFile({
+          graphBuilder,
+          compiler: angularCompiler,
+          matcher,
+          file: pending,
+          onTemplateError: (message) => log.warn(`Couldn't read part of a template in ${pending.absPath} (${oneLine(message)}).`),
+        });
+      } catch (err) {
+        log.warn(`Couldn't finish reading ${pending.absPath} (${errorMessage(err)}), so some uses in it may be missing.`, errorStack(err));
+      }
+    }
   }
 
   parseProgress.done();
