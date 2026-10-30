@@ -51,6 +51,12 @@ Only [`backfill`](/docs/reference/cli#backfill) reads this field. `scan` ignores
 | --- | --- | --- | --- |
 | `install` | non-empty string | none: `backfill` works out the install from the lockfile | Command `backfill` runs at each commit to install dependencies, through the shell, from the top of the repository. It replaces `backfill`'s own install, `nuxt prepare` included, so for a Nuxt app the command must prepare the app too. Example: `"yarn install --immutable"`. |
 
+### Custom property fields
+
+| Field | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `hookScript` | non-empty string | none | A script `scan` (and `backfill`, through the same config) runs after scanning, before uploading, to set custom properties on each component. Relative to the config folder. `--hook-script` replaces it for `scan`. See [Add custom properties with a hook script](/docs/guides/add-custom-properties). |
+
 ### Import resolution fields
 
 Rarely needed. Set these only when imports go through path aliases the scan can't find on its own. See [Resolve imports in a monorepo](/docs/guides/resolve-imports-in-a-monorepo).
@@ -91,6 +97,7 @@ What each path in the config is relative to:
 | --- | --- |
 | `include`, `exclude` | The config folder. |
 | `tsconfigPath` | The config folder. |
+| `hookScript` | The config folder. |
 | `aliases` values | The monorepo root when `scan` prints `Monorepo root: <dir>`, otherwise the config folder. |
 
 `scan` prints `Monorepo root:` when the config folder is one of a monorepo's workspace packages. [Resolve imports in a monorepo](/docs/guides/resolve-imports-in-a-monorepo#if-your-aliases-are-only-in-a-bundler-config) shows the same alias written both ways.

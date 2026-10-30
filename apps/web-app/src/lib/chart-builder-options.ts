@@ -6,9 +6,13 @@ export type ChartBuilderOptions = {
   repos: string[];
   components: PickableComponent[];
   packages: string[];
+  properties: PropertyOption[];
 };
 
-export type PickableSeries = { components: PickableComponent[]; packages: string[] };
+/** One metadata key the property series picker offers, with its distinct values. */
+export type PropertyOption = { key: string; values: string[] };
+
+export type PickableSeries = { components: PickableComponent[]; packages: string[]; properties: PropertyOption[] };
 
 /** The chart builder's scope and series lists, read from one snapshot. */
 export async function chartBuilderOptions(snapshot: StorageDriver): Promise<ChartBuilderOptions> {
@@ -21,7 +25,7 @@ export async function chartBuilderOptions(snapshot: StorageDriver): Promise<Char
   };
 }
 
-/** The components and packages one repo's scans, or every repo's, hold, including the packages only older scans hold. */
+/** The components, packages and properties one repo's scans, or every repo's, hold, including the packages only older scans hold. */
 export async function pickableSeries(snapshot: StorageDriver, repoId?: string): Promise<PickableSeries> {
   const componentList = await snapshot.listScannedComponents(repoId);
   const packageList = await snapshot.listPackages(repoId);
@@ -39,5 +43,6 @@ export async function pickableSeries(snapshot: StorageDriver, repoId?: string): 
       lastSeenAt: c.lastSeenAt,
     })),
     packages: [...packages].sort((a, b) => a.localeCompare(b)),
+    properties: await snapshot.listMetadataProperties(repoId),
   };
 }

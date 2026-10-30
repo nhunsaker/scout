@@ -38,12 +38,16 @@ The **Components** tab lists every component in the scan, most-used first. Each 
 
 ![The Components tab of vue-vben-admin filtered to the vue-ui-kits tag, with the deprecated chip and the Filter menu open on Package](/img/dashboard/repo-components-tab.png)
 
+If a [hook script](/docs/guides/add-custom-properties) sets custom properties on this scan's components, press **Columns** above the table to add up to 3 of them. Each is sortable, and reads **—** for a component the property wasn't set on.
+
 To narrow the table:
 
 - Type part of a component's name into the search box. It also finds a component by a name files render it under, such as `SettingsHeader` after `import SettingsHeader from "./Header"`. A row found that way reads `written as SettingsHeader` under its name.
 - Press the **deprecated** chip to show only deprecated components in use. While other filters are on, it reads, for example, **deprecated 3 of 12**: 3 of the 12 deprecated components in use match the other filters.
 - Press the **since previous scan** chip to show what was added, removed or changed. Added and removed rows carry a badge, and **Uses** shows the change, for example `49 (+2)`.
-- Press **Filter** to choose by **Origin** ([**External**](/docs/reference/glossary#external) or [**Local**](/docs/reference/glossary#local)), **Type**, **Package**, **Used in**, [**Tag**](/docs/reference/glossary#tag) or **Uses**. Picking two values in **Type**, **Package** or **Tag** shows components matching either; filters in different facets must all match.
+- Press **Filter** to choose by **Origin** ([**External**](/docs/reference/glossary#external) or [**Local**](/docs/reference/glossary#local)), **Type**, **Package**, **Used in**, [**Tag**](/docs/reference/glossary#tag), **Uses** or **Properties**. Picking two values in **Type**, **Package**, **Tag** or one property's own values shows components matching either; filters in different facets, including two different properties, must all match.
+
+**Properties** offers each [custom property](/docs/guides/add-custom-properties) key the scan's components carry, found only on the components this table already shows; select a key to see its values. A boolean, number or date value is matched by how it reads on the row, so picking **true** under **Has stories** keeps every component with that property set to `true`.
 
 **Type** offers **React**, **Vue**, **Web component** and **Undefined element**. **Web component** and **Undefined element** both pick out [web components](/docs/reference/glossary#web-component): **Web component** the ones a manifest or your code defines, [**Undefined element**](/docs/reference/glossary#undefined-element) the ones nothing defines.
 
@@ -70,12 +74,16 @@ The tab keeps its search and filters in the page URL, so you can copy the addres
 | `uses` | `uses=gte:10` for 10 or more, `uses=lte:10` for 10 or fewer (also `gt:`, `lt:`, or a number alone for exactly that many) |
 | `used-in` | `used-in=@acme/web`, which keeps the components used in that package |
 | `changed` | `changed=true` |
+| `prop` | `prop=Owner:@acme/ds`, the property key and one of its values joined by `:`; repeat for more values or more properties |
+| `col` | `col=Owner`, a property key shown as an extra column (see [Columns](#find-components-in-a-repo)) |
 
-Different parameters must all match. Repeating `kind`, `package` or `tag` matches any of the values. Write a space as `+`. For example:
+Different parameters must all match. Repeating `kind`, `package`, `tag`, `prop` with the same key or `col` matches or adds any of the values. Write a space as `+`. For example:
 
 ```text
 /repos/acme-web?package=@acme/ui-legacy&deprecated=true&uses=gte:10
 ```
+
+A link with two different `prop` keys, such as `prop=Owner:@acme/ds&prop=Has+stories:true`, keeps only components matching both.
 
 ## Follow adoption in a repo
 

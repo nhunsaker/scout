@@ -7,6 +7,7 @@ import type {
   Tag, TagColour, TagInput, Dashboard, DashboardInput, DashboardConfig, DashboardScope, ChartVisibility,
   GovernanceRecord, GovernanceInput, Disposition,
 } from "../dto.js";
+import { metadataValueText } from "../metadata.js";
 import {
   CHART_RESULTS_FORMAT_VERSION, chartResultKey, enqueueChartResults, type DashboardPreview, type RegistryResult, type StoredPreview, type StoredRegistry,
 } from "../chart-results.js";
@@ -43,7 +44,7 @@ function toDashboard(r: DashboardDbRow): Dashboard {
 
 const identityFields = ["identity", "framework", "attribution", "owningPackage"] as const;
 const repoFields = ["id", ...identityFields, "stats", "usage"] as const;
-const rowFields = [...repoFields, "displayName", "writtenNames", "disambiguator", "version", "usedIn"] as const;
+const rowFields = [...repoFields, "displayName", "writtenNames", "disambiguator", "version", "usedIn", "metadata"] as const;
 const summaryFields = [...repoFields, "displayName"] as const;
 const packageFields = [...summaryFields, "version", "usedIdentityKey"] as const;
 
@@ -243,6 +244,27 @@ export class PostgresDriver implements StorageDriver {
       const latest = await reader.select(repoId, { latestOnly: true });
       const older = await reader.lastHeldFacts(await reader.select(repoId, { record: false }), latest, summaryFields);
       return reduceScannedComponents(await reader.facts(latest, summaryFields), older, await snapshot.listGovernance());
+    });
+  }
+
+  async listMetadataProperties(repoId?: string) {
+    return this.read(async reader => {
+      const scans = await reader.select(repoId, { latestOnly: true });
+      const facts = await reader.facts(scans, ["metadata"]);
+      const byKey = new Map<string, Set<string>>();
+      for (const scan of facts) {
+        for (const c of scan.components) {
+          if (!c.metadata) continue;
+          for (const [key, value] of Object.entries(c.metadata)) {
+            const values = byKey.get(key) ?? new Set<string>();
+            values.add(metadataValueText(value));
+            byKey.set(key, values);
+          }
+        }
+      }
+      return [...byKey.entries()]
+        .map(([key, values]) => ({ key, values: [...values].sort((a, b) => a.localeCompare(b)) }))
+        .sort((a, b) => a.key.localeCompare(b.key));
     });
   }
 

@@ -3,12 +3,15 @@ import { parseCommand, CliError, KNOWN_COMMANDS, unknownCommandMessage } from ".
 
 describe("parseCommand", () => {
   it("parses scan string and boolean flags", () => {
-    const { values } = parseCommand("scan", ["--config", "c.json", "--dry-run", "--quiet", "--repo-id", "r1"]);
-    const { config, quiet, "repo-id": repoId } = values;
+    const { values } = parseCommand("scan", [
+      "--config", "c.json", "--dry-run", "--quiet", "--repo-id", "r1", "--hook-script", "./hook.mjs",
+    ]);
+    const { config, quiet, "repo-id": repoId, "hook-script": hookScript } = values;
     expect(config).toBe("c.json");
     expect(values["dry-run"]).toBe(true);
     expect(quiet).toBe(true);
     expect(repoId).toBe("r1");
+    expect(hookScript).toBe("./hook.mjs");
   });
 
   it("rejects an unknown flag with a suggestion and exit code 2", () => {

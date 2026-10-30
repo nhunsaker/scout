@@ -10,4 +10,5 @@ export type ResolvedConfig = {
   tsconfigPath?: string;
   aliases?: Record<string, string[]>;
   install?: string;
+  hookScript?: string;
 };

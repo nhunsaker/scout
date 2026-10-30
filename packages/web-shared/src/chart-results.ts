@@ -5,7 +5,8 @@ import { type GovernanceTracking, deriveGovernanceTracking } from "./governance-
 import { type RegistryStats, deriveRecordStats } from "./governance-registry.js";
 import { type GovernanceTarget, listGovernanceTargets } from "./governance.js";
 
-export const CHART_RESULTS_VERSION = 17;
+// Bumped alone: the `property` cohort kind is a new way to resolve a cohort, not a new stored shape.
+export const CHART_RESULTS_VERSION = 18;
 export const CHART_RESULTS_FORMAT_VERSION = 11;
 
 export type DashboardPreview = { view: DashboardView; missing: boolean };

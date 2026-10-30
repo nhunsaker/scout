@@ -4,7 +4,7 @@ import type { Component } from "@scoutui/scan-format";
  * The component fields the cohort projections read. A full scan-file `Component`
  * satisfies it, so artifact-shaped callers can pass one.
  */
-export type ComponentDigest = Pick<Component, "id" | "identity" | "framework" | "attribution" | "owningPackage" | "usage"> & {
+export type ComponentDigest = Pick<Component, "id" | "identity" | "framework" | "attribution" | "owningPackage" | "usage" | "metadata"> & {
   stats: Pick<Component["stats"], "occurrenceCount">;
 };
 
@@ -23,6 +23,10 @@ export function toComponentDigest(c: Component): ComponentDigest {
     ...(c.owningPackage !== undefined ? { owningPackage: c.owningPackage } : {}),
     stats: { occurrenceCount: c.stats.occurrenceCount },
     usage: c.usage,
+    // Carried through as the scan wrote it, an entry of a type this dashboard doesn't know
+    // included: `matches` (cohorts.ts) is the one reader, and it checks `isKnownMetadataValue`
+    // itself before comparing, so there's nothing to filter here.
+    ...(c.metadata !== undefined ? { metadata: c.metadata } : {}),
   };
 }
 

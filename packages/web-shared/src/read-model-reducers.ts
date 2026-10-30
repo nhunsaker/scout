@@ -34,7 +34,7 @@ import type { CompositionGraph } from "./composition-graph.js";
 /** The fact fields `presentIdentity` reads. */
 type IdentityFact = Pick<ComponentFact, keyof PresentableComponent>;
 export type RepoFact = IdentityFact & Pick<ComponentFact, "id" | "stats" | "usage">;
-export type ComponentRowFact = RepoFact & Pick<ComponentFact, "displayName" | "writtenNames" | "disambiguator" | "version" | "usedIn">;
+export type ComponentRowFact = RepoFact & Pick<ComponentFact, "displayName" | "writtenNames" | "disambiguator" | "version" | "usedIn" | "metadata">;
 export type SummaryFact = RepoFact & Pick<ComponentFact, "displayName">;
 export type PackageDetailFact = SummaryFact & Pick<ComponentFact, "version" | "usedIdentityKey">;
 export type CrossRepoFact = IdentityFact & Pick<ComponentFact, "id" | "stats" | "displayName" | "version">;
@@ -198,6 +198,9 @@ export function reduceComponentRows(
       ...(c.usedIn != null ? { usedIn: c.usedIn } : {}),
       deprecated: componentDeprecated(c, governance),
       tags: resolveTags(packageName, tags),
+      // Carried through unchanged: one repo's one scan has nothing to reconcile across (unlike
+      // `usage` or `totalOccurrences` elsewhere in this file, which do add up across scans).
+      ...(c.metadata ? { metadata: c.metadata } : {}),
     });
   }
   return rows;

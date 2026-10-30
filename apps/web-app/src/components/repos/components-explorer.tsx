@@ -5,9 +5,11 @@ import type { ComponentRow, ScanDiff } from "@scoutui/web-shared";
 import { scanDiffRowCount } from "@scoutui/web-shared/client";
 import { ghostRow } from "@/lib/scan-diff-view";
 import { ComponentsTable } from "@/components/repos/components-table";
+import { ColumnsControl } from "@/components/repos/columns-control";
 import { FilterBar } from "@/components/repos/filter-bar";
 import { useQueryParamsState } from "@/lib/use-query-synced-state";
 import {
+  COLUMN_PARAMS,
   deprecatedInUse,
   emptyFacets,
   FACET_PARAMS,
@@ -16,7 +18,10 @@ import {
   filterRows,
   isFiltering,
   paramsToFacets,
+  parsePropertyColumns,
+  propertyColumnsToParams,
   rowsUsedIn,
+  topMetadataKeys,
   usedInOptions,
   type FacetState,
 } from "@/lib/component-facets";
@@ -49,6 +54,11 @@ export function ComponentsExplorer({
 }) {
   const notInLatestIds = useMemo(() => new Set(notInLatest), [notInLatest]);
   const [facets, setFacets] = useQueryParamsState<FacetState>(FACET_PARAMS, paramsToFacets, facetsToParams);
+  // The 3 most common metadata keys, offered as optional columns (there is no general column
+  // picker yet; see CODING_STANDARDS and the dashboard guide for why this is capped at 3).
+  const availableColumns = useMemo(() => topMetadataKeys(rows), [rows]);
+  const [rawColumns, setColumns] = useQueryParamsState<string[]>(COLUMN_PARAMS, parsePropertyColumns, propertyColumnsToParams);
+  const columns = useMemo(() => rawColumns.filter((key) => availableColumns.includes(key)), [rawColumns, availableColumns]);
 
   // `usedIn` narrows the rows to one package's, with that package's uses and
   // files, before every other facet, count and sort.
@@ -98,6 +108,11 @@ export function ComponentsExplorer({
         filtering={isFiltering({ ...facets, changed: false, usedIn: null })}
         canEdit={canEdit}
       />
+      {availableColumns.length > 0 ? (
+        <div className="flex justify-end border-b px-3 py-1.5">
+          <ColumnsControl available={availableColumns} selected={columns} onChange={setColumns} />
+        </div>
+      ) : null}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-2 px-3 py-12 text-center">
           <p className="text-sm text-muted-foreground">No components match these filters.</p>
@@ -118,6 +133,7 @@ export function ComponentsExplorer({
           notInLatest={notInLatestIds}
           search={facets.text}
           usedIn={facets.usedIn}
+          columns={columns}
         />
       )}
     </div>

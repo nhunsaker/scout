@@ -31,6 +31,11 @@
       "type": "string",
       "minLength": 1,
       "description": "The command scout backfill runs at each commit to install dependencies, from the repository root. Leave it out and backfill works it out from the lockfile."
+    },
+    "hookScript": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A script scout scan runs after scanning, before uploading, to set custom properties on each component (see the add-custom-properties guide). Relative to this config file's folder. --hook-script overrides it."
     }
   }
 }

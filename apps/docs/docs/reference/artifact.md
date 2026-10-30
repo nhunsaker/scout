@@ -21,7 +21,7 @@ The file is one JSON object with four keys:
 Most questions are answered from `components` and `occurrences`. Each use the scan matched names its component by the component's `id`.
 
 :::note
-A newer CLI can add values to some lists: `credit.kind`, a `trace` step's `kind`, an unmatched use's `reason.kind` and `reason.code`, and the `confidence`, `strongestClass`, `reason`, `source`, `strength` and `disposition` values in a tag's `attribution`. If you read the file with your own scripts, skip values you don't recognise. The other lists of values in `components[]` and `occurrences[]` change only with a new `meta.schemaVersion`.
+A newer CLI can add values to some lists: `credit.kind`, a `trace` step's `kind`, an unmatched use's `reason.kind` and `reason.code`, a `metadata` value's `type`, and the `confidence`, `strongestClass`, `reason`, `source`, `strength` and `disposition` values in a tag's `attribution`. If you read the file with your own scripts, skip values you don't recognise. The other lists of values in `components[]` and `occurrences[]` change only with a new `meta.schemaVersion`.
 :::
 
 ## Paths {#paths}
@@ -54,6 +54,7 @@ These fields are less often needed:
 | `declared` | object \| absent | Components defined in the repo only: the props the component's own code declares. See [`declared`](#declared). |
 | `definition` | `{ line, column }` \| absent | React components defined in the repo only: where the declaration starts in `identity.filePath`. `line` and `column` count from 1. |
 | `owningPackage` | `string` \| absent | Components defined in the repo only: the name of the package the file belongs to. That is the deepest workspace package whose folder holds the file, else the [root package](#root-package). Absent when the file is outside the root package's folder. |
+| `metadata` | object \| absent | Custom properties a [`--hook-script`](/docs/guides/add-custom-properties) set on this component. Absent when no hook is configured, or the hook set nothing on this component. See [`metadata`](#metadata). |
 
 ```json title="A components[] entry"
 {
@@ -210,6 +211,26 @@ Which components this one renders and which render it. Component A *renders* com
 | `isLeafCount` | `number` | Equal to `stats.occurrenceCount` when `rendersByCount` is empty, otherwise `0`. |
 
 Keys are `components[].id` values. Look them up in `components[]` to get names. Only ids that are in `components[]` appear.
+
+### `metadata` {#metadata}
+
+Custom properties a [hook script](/docs/guides/add-custom-properties) set on this component with `setMetadata`, such as its owner or whether it has stories. Keyed by the property's name: letters, digits, spaces, `.`, `_` and `-`, starting with a letter, up to 64 characters, at most 32 keys per component.
+
+| `type` | Other fields | Value |
+| --- | --- | --- |
+| `"string"` | `value: string` | Up to 256 characters. |
+| `"number"` | `value: number` | A finite number. |
+| `"boolean"` | `value: boolean` | |
+| `"date"` | `value: string` | An ISO 8601 UTC timestamp. |
+
+```json title="metadata set by a hook script"
+{
+  "owner": { "type": "string", "value": "design-systems" },
+  "hasStories": { "type": "boolean", "value": true },
+  "propCount": { "type": "number", "value": 4 },
+  "reviewed": { "type": "date", "value": "2026-01-15T00:00:00.000Z" }
+}
+```
 
 ## `occurrences[]` {#occurrences}
 

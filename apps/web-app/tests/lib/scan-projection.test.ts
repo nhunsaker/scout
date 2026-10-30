@@ -529,3 +529,41 @@ describe.skipIf(!databaseUrl)("upload-backed publication", { timeout: 30_000 }, 
     });
   });
 });
+
+describe.skipIf(!databaseUrl)("custom properties (metadata) in the read model", { timeout: 30_000 }, () => {
+  const panel = component(repoDeclaration("metadata-repo", "src/Panel.tsx", "Panel"), {
+    metadata: { Owner: { type: "string", value: "@acme/ds" }, "DS version": { type: "number", value: 3 } },
+  });
+  const button = component(packageExport("@example/ui", "Button")); // no metadata at all
+
+  it("returns a scan's metadata on the component list and the component detail", async () => {
+    await withReadModelDatabase(async pool => {
+      const scan = v2Artifact({ scanId: "scan-metadata", repoId: "metadata-repo", components: [panel, button], occurrences: [] });
+      await publishScan(pool, scan, { uploadedByUserId: null });
+      const driver = new PostgresDriver(pool);
+      const expected = { Owner: { type: "string", value: "@acme/ds" }, "DS version": { type: "number", value: 3 } };
+      const rows = await driver.listComponentsForRepo("metadata-repo", "");
+      expect(rows.find(r => r.componentId === panel.id)?.metadata).toEqual(expected);
+      expect(rows.find(r => r.componentId === button.id)?.metadata).toBeUndefined();
+      const head = await driver.getComponentDetailHead("metadata-repo", panel.id);
+      expect(head?.metadata).toEqual(expected);
+      const otherHead = await driver.getComponentDetailHead("metadata-repo", button.id);
+      expect(otherHead?.metadata).toBeUndefined();
+      expect(await driver.listMetadataProperties("metadata-repo")).toEqual([
+        { key: "DS version", values: ["3"] },
+        { key: "Owner", values: ["@acme/ds"] },
+      ]);
+    });
+  });
+
+  it("reprojects an older stored scan with no metadata without failing: its rows simply carry none", async () => {
+    await withReadModelDatabase(async pool => {
+      const scan = v2Artifact({ scanId: "scan-no-metadata", repoId: "no-metadata-repo", components: [button], occurrences: [] });
+      await publishScan(pool, scan, { uploadedByUserId: null });
+      const driver = new PostgresDriver(pool);
+      const rows = await driver.listComponentsForRepo("no-metadata-repo", "");
+      expect(rows.find(r => r.componentId === button.id)?.metadata).toBeUndefined();
+      expect(await driver.listMetadataProperties("no-metadata-repo")).toEqual([]);
+    });
+  });
+});

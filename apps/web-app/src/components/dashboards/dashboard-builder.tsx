@@ -6,7 +6,9 @@ import type { ChartRange, ChartType, ChartVisibility, CohortSelector, Dashboard,
 import { cohortKey, unknownCohortKeys } from "@scoutui/web-shared/client";
 import { actionErrorMessage } from "@/lib/action-error";
 import { type LibraryTag, type PickableComponent, deprecatedShare, deprecatedShareText, offersDeprecatedOnly, tagsInUse } from "@/lib/chart-builder-series";
+import type { PropertyOption } from "@/lib/chart-builder-options";
 import { searchSeries } from "@/lib/identity-search";
+import { PropertySeriesPicker } from "@/components/dashboards/property-series-picker";
 import type { ReadModelUnavailable, SkippedNotices } from "@/lib/read-model-state";
 import { type ChartCohort, chartColors, deprecatedOnlyKeys, drawnChartCohorts, lineColors } from "@/lib/dashboard-chart-data";
 import { cn } from "@/lib/utils";
@@ -94,6 +96,8 @@ function cohortLabel(
     }
     case "tag":
       return libraryTags.find((t) => t.id === sel.tagId)?.label;
+    case "property":
+      return `${sel.key}: ${sel.value}`;
   }
 }
 
@@ -119,6 +123,7 @@ export function DashboardBuilder({
   repos,
   components,
   packages,
+  properties,
   saved,
   duplicate = false,
 }: {
@@ -126,6 +131,7 @@ export function DashboardBuilder({
   repos: string[];
   components: PickableComponent[];
   packages: string[];
+  properties: PropertyOption[];
   /** A saved chart to edit: the builder opens with it and saves back to it, or with `duplicate`, saves a new chart. */
   saved?: Pick<Dashboard, "id" | "name" | "description" | "config" | "visibility">;
   duplicate?: boolean;
@@ -153,7 +159,7 @@ export function DashboardBuilder({
 
   // A repo scope narrows the picker to what that repo's latest scan contains. The
   // estate-wide lists still supply labels, and come back when the scope clears.
-  const [scopedPickable, setScopedPickable] = useState<{ components: PickableComponent[]; packages: string[] } | null>(null);
+  const [scopedPickable, setScopedPickable] = useState<{ components: PickableComponent[]; packages: string[]; properties: PropertyOption[] } | null>(null);
   const [pickerUnavailable, setPickerUnavailable] = useState<ReadModelUnavailable | null>(null);
   const [pickerError, setPickerError] = useState(false);
   const [pickerRetry, setPickerRetry] = useState(0);
@@ -187,6 +193,7 @@ export function DashboardBuilder({
     [libraryTags, scopedPickable],
   );
   const pickerPackages = scopedPickable?.packages ?? packages;
+  const pickerProperties = scopedPickable?.properties ?? properties;
   const selectedKeys = useMemo(() => new Set(cohorts.map(selectorKey)), [cohorts]);
   const [seriesScope, setSeriesScope] = useState<string | null>(null);
   const searchSeriesRows = useCallback(
@@ -491,7 +498,7 @@ export function DashboardBuilder({
           ) : scopeRepoId && !scopedPickable ? (
             <output className="text-sm text-muted-foreground">Loading…</output>
           ) : (
-            <div>
+            <div className="space-y-2">
               <label id="series-search-label" htmlFor="series-search" className="sr-only">
                 Add a series
               </label>
@@ -506,6 +513,10 @@ export function DashboardBuilder({
                 placeholder="Add a series"
                 emptyText="Nothing scanned yet"
               />
+              {/* A manual series over one metadata value, e.g. Owner: @acme/ds (see the CLI's
+                  custom-properties guide). Separate from the search above: there is nothing to
+                  type-ahead against until a key is picked. */}
+              <PropertySeriesPicker options={pickerProperties} added={selectedKeys} onAdd={toggleSeries} />
             </div>
           )}
         </aside>

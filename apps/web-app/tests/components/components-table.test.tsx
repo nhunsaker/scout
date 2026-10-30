@@ -109,6 +109,56 @@ describe("ComponentsTable", () => {
     });
   });
 
+  describe("property columns", () => {
+    it("adds no extra column when none are requested", () => {
+      render(<ComponentsTable repoId="r1" rows={[row]} />);
+      expect(screen.queryByRole("columnheader", { name: /owner/i })).toBeNull();
+    });
+
+    it("adds one header and cell per requested key, reading the row's value", () => {
+      const owned: ComponentRow = { ...row, metadata: { Owner: { type: "string", value: "@acme/ds" } } };
+      const unowned: ComponentRow = { ...row, componentId: "c2", displayName: "Field" };
+      render(<ComponentsTable repoId="r1" rows={[owned, unowned]} columns={["Owner"]} />);
+      expect(screen.getByRole("columnheader", { name: "Owner" })).toBeInTheDocument();
+      // A property name can be longer than its column, so the full name is the header's tooltip.
+      expect(screen.getByRole("button", { name: "Owner" })).toHaveAttribute("title", "Owner");
+      const ownedCell = within(screen.getByText("Button").closest("tr") as HTMLElement).getByTitle("@acme/ds");
+      expect(ownedCell.textContent).toBe("@acme/ds");
+      const unownedRow = screen.getByText("Field").closest("tr") as HTMLElement;
+      expect(within(unownedRow).getAllByRole("cell").find((c) => c.textContent === "—")).toBeDefined();
+    });
+
+    it("renders a date value short, and a boolean or number by its text form", () => {
+      const dated: ComponentRow = { ...row, metadata: { "Last audit": { type: "date", value: "2026-01-15T00:00:00Z" }, "Has stories": { type: "boolean", value: true } } };
+      render(<ComponentsTable repoId="r1" rows={[dated]} columns={["Last audit", "Has stories"]} />);
+      expect(screen.getByRole("columnheader", { name: "Last audit" })).toBeInTheDocument();
+      expect(screen.getByText("Jan 15, 2026")).toBeInTheDocument();
+      expect(screen.getByText("true")).toBeInTheDocument();
+    });
+
+    it("sorts by a property column's text value, blanks last either way", () => {
+      const names = () => screen.getAllByRole("link").map((l) => l.textContent);
+      const high: ComponentRow = { ...row, componentId: "h", displayName: "High", metadata: { Priority: { type: "string", value: "zz" } } };
+      const low: ComponentRow = { ...row, componentId: "l", displayName: "Low", metadata: { Priority: { type: "string", value: "aa" } } };
+      const none: ComponentRow = { ...row, componentId: "n", displayName: "None" };
+      render(<ComponentsTable repoId="r1" rows={[low, none, high]} columns={["Priority"]} />);
+      fireEvent.click(screen.getByRole("button", { name: "Priority" }));
+      expect(names()).toEqual(["Low", "High", "None"]);
+      fireEvent.click(screen.getByRole("button", { name: "Priority" }));
+      expect(names()).toEqual(["High", "Low", "None"]);
+    });
+
+    it("shows a dash for a property column on a removed (ghost) row", () => {
+      const removed = ghostRow({
+        componentId: "gone", displayName: "OldModal", packageName: "@x/lib", scope: "external",
+        kind: "react-component", occurrenceCount: 5, deprecated: false, tags: [],
+      });
+      render(<ComponentsTable repoId="r1" rows={[row, removed]} marks={{ c1: { kind: "changed", delta: 2 }, gone: { kind: "removed" } }} columns={["Owner"]} />);
+      const tr = screen.getByText("OldModal").closest("tr") as HTMLElement;
+      expect(within(tr).getAllByText("—").length).toBeGreaterThan(0);
+    });
+  });
+
   describe("changed view (scan diff)", () => {
     const removed = ghostRow({
       componentId: "gone", displayName: "OldModal", packageName: "@x/lib", scope: "external",

@@ -5,7 +5,7 @@
 // Facets combine with AND, and the values within a facet with OR.
 
 import type { ComponentRow } from "@scoutui/web-shared";
-import { friendlyKind, type QueryView } from "@scoutui/web-shared/client";
+import { friendlyKind, metadataValueLabel, metadataValueText, type QueryView } from "@scoutui/web-shared/client";
 import { hrefWithQuery, type QueryParams } from "@/lib/query-string";
 
 export type OriginValue = "external" | "local";
@@ -22,10 +22,13 @@ export type FacetState = {
   changed: boolean; // true = only rows that moved since the last scan (needs the diff's marks; applied by the explorer)
   occurrences: { op: OccurrenceOp; value: number } | null;
   usedIn: string | null; // one package; every count becomes that package's
+  // Selected metadata values, by key: OR within a key, AND across keys (like tags, but keyed).
+  // A key with no selected value is absent, never an empty array.
+  properties: Record<string, string[]>;
 };
 
 export function emptyFacets(): FacetState {
-  return { text: "", origin: null, kinds: [], packages: [], tags: [], deprecated: null, changed: false, occurrences: null, usedIn: null };
+  return { text: "", origin: null, kinds: [], packages: [], tags: [], deprecated: null, changed: false, occurrences: null, usedIn: null, properties: {} };
 }
 
 export const KIND_LABEL: Record<KindValue, string> = {
@@ -58,6 +61,7 @@ export function isFiltering(f: FacetState): boolean {
     f.deprecated !== null ||
     f.occurrences !== null ||
     f.usedIn !== null ||
+    Object.values(f.properties).some((values) => values.length > 0) ||
     f.changed
   );
 }
@@ -84,6 +88,55 @@ export function deprecatedInUse(r: ComponentRow): boolean {
   return r.deprecated && r.occurrenceCount > 0;
 }
 
+/** `properties` with `value` toggled under `key`: added if absent, removed if present. The key
+ *  itself is dropped once its last value is removed, keeping the "no empty array" invariant. */
+export function togglePropertyValue(properties: Record<string, string[]>, key: string, value: string): Record<string, string[]> {
+  const current = properties[key] ?? [];
+  const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+  const result = { ...properties };
+  if (next.length) result[key] = next;
+  else delete result[key];
+  return result;
+}
+
+/** The row's value under a metadata key, as plain text (see `metadataValueText`); undefined when the row carries no such key. */
+export function propertyValueText(r: ComponentRow, key: string): string | undefined {
+  const v = r.metadata?.[key];
+  return v === undefined ? undefined : metadataValueText(v);
+}
+
+/** The row's value under a metadata key, for display (see `metadataValueLabel`: a `date` renders short); undefined when the row carries no such key. */
+export function propertyValueLabel(r: ComponentRow, key: string): string | undefined {
+  const v = r.metadata?.[key];
+  return v === undefined ? undefined : metadataValueLabel(v);
+}
+
+/**
+ * The metadata keys offered as optional table columns: the `limit` most common across `rows`
+ * (every row the page knows, not the filtered set, so the choice doesn't shift as the table is
+ * filtered), ties broken alphabetically.
+ */
+export function topMetadataKeys(rows: readonly ComponentRow[], limit = 3): string[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) for (const key of Object.keys(r.metadata ?? {})) counts.set(key, (counts.get(key) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([key]) => key);
+}
+
+/** The param the table's optional property columns live in. */
+export const COLUMN_PARAMS = ["col"];
+
+/** The `col` URL param: which of `topMetadataKeys` the table shows as columns. */
+export function parsePropertyColumns(params: URLSearchParams): string[] {
+  return [...new Set(params.getAll("col"))].filter(Boolean);
+}
+
+export function propertyColumnsToParams(columns: string[]): QueryParams {
+  return columns.map((key) => ["col", key]);
+}
+
 /** Does a row match the facets? `changed` is the explorer's to apply; this never reads it. */
 function matchesRow(r: ComponentRow, f: FacetState): boolean {
   const text = f.text.trim().toLowerCase();
@@ -98,6 +151,11 @@ function matchesRow(r: ComponentRow, f: FacetState): boolean {
   if (f.deprecated === true && !deprecatedInUse(r)) return false;
   if (f.deprecated === false && r.deprecated) return false;
   if (f.occurrences && !occurrenceMatches(r.occurrenceCount, f.occurrences.op, f.occurrences.value)) return false;
+  for (const [key, values] of Object.entries(f.properties)) {
+    if (values.length === 0) continue;
+    const rowValue = propertyValueText(r, key);
+    if (rowValue === undefined || !values.includes(rowValue)) return false;
+  }
   return true;
 }
 
@@ -124,12 +182,17 @@ export function usedInOptions(rows: readonly ComponentRow[], f: FacetState): { v
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
+/** One metadata key's offered values, each with its count under the other filters. */
+export type PropertyFacetOption = { key: string; values: { value: string; label: string; count: number }[] };
+
 /** What the Filter menu and the status chips offer, each value with its count. */
 export type FacetOptions = {
   origin: { external: number; local: number };
   kinds: { value: KindValue; count: number }[];
   packages: { value: string; count: number }[];
   tags: { value: string; color: string; count: number }[];
+  /** Only keys the rows in scope carry (plus any selected key, even at 0); see `facetOptions`. */
+  properties: PropertyFacetOption[];
   deprecatedCount: number;
   /** Rows the changed view shows under the other filters; null when there is no
    *  changed view to offer (a first scan, or no row moved). */
@@ -180,6 +243,13 @@ export function facetOptions(
   const tagCounts = new Map<string, { color: string; count: number }>(f.tags.map((t) => [t, { color: "", count: 0 }]));
   let deprecatedCount = 0;
 
+  // One map per selected or present key, each value → { label, count }; a selected value starts at 0
+  // so it stays offered even where none of `known` carries it (e.g. only a removed ghost did).
+  const propertyCounts = new Map<string, Map<string, { label: string; count: number }>>();
+  for (const [key, values] of Object.entries(f.properties)) {
+    propertyCounts.set(key, new Map(values.map((v) => [v, { label: v, count: 0 }])));
+  }
+
   for (const r of known) {
     const counted = inBase.has(r.componentId);
     origin[r.scope] += counted && matchesRow(r, withoutOrigin) ? 1 : 0;
@@ -193,6 +263,15 @@ export function facetOptions(
       tagCounts.set(value, { color, count: (tagCounts.get(value)?.count ?? 0) + inTags });
     }
     if (counted && deprecatedInUse(r) && matchesRow(r, withoutDeprecated)) deprecatedCount++;
+    for (const [key, raw] of Object.entries(r.metadata ?? {})) {
+      const withoutKey: FacetState = { ...f, properties: { ...f.properties, [key]: [] } };
+      if (!(counted && matchesRow(r, withoutKey))) continue;
+      const values = propertyCounts.get(key) ?? new Map<string, { label: string; count: number }>();
+      const value = metadataValueText(raw);
+      const prev = values.get(value);
+      values.set(value, { label: prev?.label ?? metadataValueLabel(raw), count: (prev?.count ?? 0) + 1 });
+      propertyCounts.set(key, values);
+    }
   }
 
   const kinds = (Object.keys(KIND_LABEL) as KindValue[])
@@ -205,6 +284,14 @@ export function facetOptions(
   const tags = [...tagCounts.entries()]
     .map(([value, { color, count }]) => ({ value, color, count }))
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+  const properties = [...propertyCounts.entries()]
+    .map(([key, values]) => ({
+      key,
+      values: [...values.entries()]
+        .map(([value, { label, count }]) => ({ value, label, count }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
   const changedCount = changed === null ? null : changed.filter((r) => matchesRow(r, f)).length;
 
   return {
@@ -212,6 +299,7 @@ export function facetOptions(
     kinds,
     packages,
     tags,
+    properties,
     deprecatedCount,
     changedCount,
     deprecatedMax: known.filter(deprecatedInUse).length,
@@ -221,8 +309,10 @@ export function facetOptions(
 
 // --- URL params ---------------------------------------------------------------
 
-/** The params the components table keeps its facets in. */
-export const FACET_PARAMS = ["q", "origin", "kind", "package", "tag", "deprecated", "uses", "used-in", "changed"];
+/** The params the components table keeps its facets in. One `prop` param per selected (key,
+ *  value) pair, as `key:value` (split on the first colon); a key practice never puts a colon in
+ *  (see the CLI's hook-script guide), so this round-trips the keys this dashboard actually sees. */
+export const FACET_PARAMS = ["q", "origin", "kind", "package", "tag", "deprecated", "uses", "used-in", "changed", "prop"];
 
 const KINDS: readonly KindValue[] = ["react", "vue", "wc", "undefined-element"];
 const OCCURRENCE_WORDS: Record<OccurrenceOp, string> = { ">=": "gte:", ">": "gt:", "<=": "lte:", "<": "lt:", "=": "" };
@@ -245,6 +335,9 @@ export function facetsToParams(f: FacetState): QueryParams {
   if (f.occurrences) params.push(["uses", `${OCCURRENCE_WORDS[f.occurrences.op]}${f.occurrences.value}`]);
   if (f.usedIn) params.push(["used-in", f.usedIn]);
   if (f.changed) params.push(["changed", "true"]);
+  for (const [key, values] of Object.entries(f.properties)) {
+    for (const value of values) params.push(["prop", `${key}:${value}`]);
+  }
   return params;
 }
 
@@ -266,5 +359,17 @@ export function paramsToFacets(params: URLSearchParams): FacetState {
     const op = (Object.keys(OCCURRENCE_WORDS) as OccurrenceOp[]).find((k) => OCCURRENCE_WORDS[k] === (om[1] ?? ""));
     if (op) f.occurrences = { op, value: Number(om[2]) };
   }
+  const properties: Record<string, string[]> = {};
+  for (const raw of params.getAll("prop")) {
+    const i = raw.indexOf(":");
+    if (i < 0) continue;
+    const key = raw.slice(0, i);
+    const value = raw.slice(i + 1);
+    if (!key || !value) continue;
+    const values = properties[key] ?? [];
+    if (!values.includes(value)) values.push(value);
+    properties[key] = values;
+  }
+  f.properties = properties;
   return f;
 }

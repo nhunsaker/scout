@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { GitCompareArrows } from "lucide-react";
+import { ChevronLeft, ChevronRight, GitCompareArrows } from "lucide-react";
 import { plural } from "@scoutui/web-shared/client";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { movementParts } from "@/lib/scan-diff-view";
 import { DeprecatedFilterChip } from "@/components/deprecated-filter-chip";
@@ -15,11 +16,13 @@ import {
   KIND_LABEL,
   ORIGIN_DESCRIPTION,
   ORIGIN_LABEL,
+  togglePropertyValue,
   type FacetOptions,
   type FacetState,
   type KindValue,
   type OccurrenceOp,
   type OriginValue,
+  type PropertyFacetOption,
 } from "@/lib/component-facets";
 
 export function FilterBar({
@@ -117,6 +120,12 @@ export function FilterBar({
       picker: <OccurrencePicker facets={facets} onChange={onChange} />,
       active: facets.occurrences ? 1 : 0,
     },
+    {
+      key: "property",
+      label: "Properties",
+      picker: <PropertyFacetPicker options={options.properties} facets={facets} onChange={onChange} />,
+      active: Object.values(facets.properties).reduce((n, values) => n + values.length, 0),
+    },
   ];
 
   const pills: FilterPill[] = [
@@ -140,6 +149,15 @@ export function FilterBar({
       ? [{ key: "used-in", field: "used in", value: facets.usedIn, mono: true, onRemove: () => onChange({ ...facets, usedIn: null }) }]
       : []),
     ...tagPills(options.tags, facets.tags, setTags),
+    ...Object.entries(facets.properties).flatMap(([key, values]) =>
+      values.map((value) => ({
+        key: `prop:${key}:${value}`,
+        field: key,
+        value: options.properties.find((o) => o.key === key)?.values.find((v) => v.value === value)?.label ?? value,
+        mono: true,
+        onRemove: () => onChange({ ...facets, properties: togglePropertyValue(facets.properties, key, value) }),
+      })),
+    ),
     // Only `deprecated: false` gets a pill: `true` shows as the chip's pressed
     // state, while `false` arrives only from a pasted URL and needs a way to be
     // removed. `changed` needs none: its chip shows `true`, and `false` is the
@@ -308,6 +326,93 @@ function OccurrencePicker({ facets, onChange }: { facets: FacetState; onChange: 
           className="h-7 flex-1 text-base tabular-nums sm:text-xs"
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The Properties facet's picker: a key list, then (drilling in like the Filter menu itself) that
+ * key's values as ticked chips. Only keys the rows in scope carry are offered (see `facetOptions`).
+ * Values within a key are OR'd; picking a second key ANDs it in.
+ */
+function PropertyFacetPicker({
+  options,
+  facets,
+  onChange,
+}: {
+  options: PropertyFacetOption[];
+  facets: FacetState;
+  onChange: (next: FacetState) => void;
+}) {
+  const [key, setKey] = useState<string | null>(null);
+  const current = options.find((o) => o.key === key);
+
+  if (!current) {
+    return (
+      <ul className="flex max-h-64 flex-col overflow-y-auto py-1">
+        {options.length === 0 ? (
+          <li className="px-3 py-2 text-xs text-muted-foreground">No properties on these components.</li>
+        ) : (
+          options.map((o) => {
+            const n = (facets.properties[o.key] ?? []).length;
+            return (
+              <li key={o.key}>
+                <button
+                  type="button"
+                  onClick={() => setKey(o.key)}
+                  className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs">{o.key}</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    {n > 0 ? <span className="text-xs tabular-nums text-foreground">{n}</span> : null}
+                    <ChevronRight className="size-3.5" />
+                  </span>
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
+    );
+  }
+
+  const selected = facets.properties[current.key] ?? [];
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1.5 border-b px-2 py-1.5">
+        <button
+          type="button"
+          onClick={() => setKey(null)}
+          aria-label="Back to properties"
+          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <span className="truncate font-mono text-xs text-muted-foreground">{current.key}</span>
+      </div>
+      <ul className="flex max-h-64 flex-col overflow-y-auto py-1">
+        {current.values.length === 0 ? (
+          <li className="px-3 py-2 text-xs text-muted-foreground">None match the other filters.</li>
+        ) : (
+          current.values.map((v) => {
+            const checked = selected.includes(v.value);
+            return (
+              <li key={v.value}>
+                <button
+                  type="button"
+                  aria-pressed={checked}
+                  onClick={() => onChange({ ...facets, properties: togglePropertyValue(facets.properties, current.key, v.value) })}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                >
+                  <Checkbox checked={checked} tabIndex={-1} aria-hidden className="pointer-events-none" />
+                  <span className="min-w-0 flex-1 truncate">{v.label}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{v.count.toLocaleString()}</span>
+                </button>
+              </li>
+            );
+          })
+        )}
+      </ul>
     </div>
   );
 }

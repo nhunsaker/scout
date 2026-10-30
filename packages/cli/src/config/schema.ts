@@ -20,6 +20,7 @@ export interface ConfigFile {
   tsconfigPath?: string;
   aliases?: Record<string, string[]>;
   install?: string;
+  hookScript?: string;
 }
 
 const ajv = new Ajv({ allErrors: true, strict: false });

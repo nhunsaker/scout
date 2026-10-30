@@ -12,6 +12,7 @@ export type {
   Known,
   KnownEvidenceRecord,
   KnownTagAttribution,
+  MetadataValue,
   Occurrence,
   PropDistribution,
   PropValueEntry,
@@ -25,7 +26,7 @@ export type {
   TraceStep,
   UnresolvedReason,
 } from "./schema.js";
-export { isKind } from "./schema.js";
+export { isKind, METADATA_MAX_KEYS, metadataKeyPattern } from "./schema.js";
 export { compareCliVersions, isSnapshotVersion } from "./cli-version.js";
 export { componentKey } from "./component-key.js";
 export { sameComponentName } from "./component-name.js";

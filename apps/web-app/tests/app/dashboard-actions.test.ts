@@ -30,6 +30,7 @@ const storage = {
         soleVersion: "1.0.0",
       }))
     : [],
+  listMetadataProperties: async (repoId?: string) => repoId === "known" ? [{ key: "Owner", values: ["@acme/ds"] }] : [],
 };
 
 describe("pickableForRepo", () => {
@@ -39,10 +40,11 @@ describe("pickableForRepo", () => {
     if (result.state !== "ready") throw new Error("Expected ready picker");
     expect(result.value.packages).toEqual(["@x/aggregate", "@x/lib"]);
     expect(result.value.components).toEqual([{ componentId: "77b809260ecd27fe", displayName: "Address", packageName: "@x/lib", disambiguator: null, deprecated: true, occurrences: 3, local: false, lastSeenAt: null }]);
+    expect(result.value.properties).toEqual([{ key: "Owner", values: ["@acme/ds"] }]);
   });
 
   it("returns no options when the repo has no scan", async () => {
-    expect(await pickableForRepo("missing")).toEqual({ state: "ready", value: { components: [], packages: [] }, fallbacks: [], gaps: [] });
+    expect(await pickableForRepo("missing")).toEqual({ state: "ready", value: { components: [], packages: [], properties: [] }, fallbacks: [], gaps: [] });
   });
 });
 

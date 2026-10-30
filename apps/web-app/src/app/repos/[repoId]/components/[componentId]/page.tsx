@@ -5,6 +5,7 @@ import { readModelPage, readModelTitle } from "@/lib/read-model-page";
 import { ReadModelState, SkippedScansNotice } from "@/components/read-model-state";
 import { parseGitRemote } from "@scoutui/scan-format/git-remote";
 import { ComponentDetailHeader } from "@/components/component-detail/component-detail-header";
+import { PropertiesPanel } from "@/components/component-detail/properties-panel";
 import { DetailTabs } from "@/components/component-detail/detail-tabs";
 import { can } from "@/lib/access";
 import { identify } from "@/lib/identity";
@@ -60,6 +61,7 @@ export default async function ComponentDetailPage({
   return (
     <div className="space-y-6">
       <ComponentDetailHeader detail={detail} canEdit={canEdit} />
+      <PropertiesPanel metadata={detail.metadata} />
       <SkippedScansNotice fallbacks={page.fallbacks} ownPage />
       <DetailTabs detail={detail} graph={graph ?? { nodes: [], edges: [] }} source={source} />
     </div>

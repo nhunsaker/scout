@@ -121,6 +121,13 @@ export interface StorageDriver {
   /** Every component one repo's scans, or every repo's, hold, presented as `listComponents` presents them. */
   listScannedComponents(repoId?: string): Promise<ScannedComponent[]>;
 
+  /**
+   * Every metadata key one repo's latest scan holds, or every repo's, with the distinct values
+   * seen under it (each as `metadataValueText`), sorted. What the chart builder's property series
+   * picker offers.
+   */
+  listMetadataProperties(repoId?: string): Promise<{ key: string; values: string[] }[]>;
+
   // ---- Tags (org-scoped, web-authored config) ----
 
   /** All tags, sorted by value. */
