@@ -1,0 +1,2 @@
+# A CODEOWNERS file at a custom, non-default path.
+* @example/from-custom-path

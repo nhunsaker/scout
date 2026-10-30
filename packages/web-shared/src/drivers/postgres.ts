@@ -4,7 +4,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import { GovernanceTargetConflictError, ReadModelUnavailableError, type ScanFallback, type SkippedScans, type StorageDriver } from "../storage.js";
 import type {
-  Tag, TagColour, TagInput, Dashboard, DashboardInput, DashboardConfig, DashboardScope, ChartVisibility,
+  Tag, TagColour, TagInput, TagRule, Dashboard, DashboardInput, DashboardConfig, DashboardScope, ChartVisibility,
   GovernanceRecord, GovernanceInput, Disposition,
 } from "../dto.js";
 import { metadataValueText } from "../metadata.js";
@@ -279,12 +279,10 @@ export class PostgresDriver implements StorageDriver {
 
   async listTags(): Promise<Tag[]> {
     const result = await this.db.execute(sql<{
-      id: string; value: string; category: string | null; color: TagColour;
-      rule: { glob: string[]; exact: string[] };
+      id: string; value: string; category: string | null; color: TagColour; rule: TagRule;
     }>`SELECT id, value, category, color, rule FROM tags ORDER BY value`);
     return (result.rows as {
-      id: string; value: string; category: string | null; color: TagColour;
-      rule: { glob: string[]; exact: string[] };
+      id: string; value: string; category: string | null; color: TagColour; rule: TagRule;
     }[]).map((r) => ({ id: r.id, value: r.value, category: r.category, color: r.color, rule: r.rule }));
   }
 

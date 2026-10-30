@@ -105,7 +105,7 @@ describe("diffDigests", () => {
     expect(diffDigests(after, before, [], []).marks).toEqual({ [held.id]: { kind: "added" } });
   });
 
-  it("resolves a removed row's tags through resolveTags: a matching package carries the TagRef, local (no package) carries none", () => {
+  it("resolves a removed row's tags through resolveTags: a matching package carries the TagRef, local (no package) carries none from a package-only rule", () => {
     const forms: Tag = {
       id: "t-forms", value: "forms", category: null, color: "teal",
       rule: { glob: ["@x/forms/*"], exact: [] },
@@ -119,6 +119,20 @@ describe("diffDigests", () => {
       { id: "t-forms", value: "forms", category: null, color: "teal" },
     ]);
     expect(d.removedRows.find((r) => r.componentId === loc.id)?.tags).toEqual([]);
+  });
+
+  it("resolves a removed local row's tags by its display name (PR-10 component rule), where a package rule can't reach it", () => {
+    const named: Tag = {
+      id: "t-loc", value: "loc", category: null, color: "teal",
+      rule: { glob: [], exact: [], component: { glob: ["Loc*"], exact: [] } },
+    };
+    const loc = component(repoDeclaration("r1", "src/Loc.tsx", "Loc"));
+    const before = scan("S1", "2026-09-01T00:00:00.000Z", [[loc, 2]]);
+    const after = scan("S2", "2026-09-02T00:00:00.000Z", []);
+    const d = diffDigests(after, before, [], [named]);
+    expect(d.removedRows.find((r) => r.componentId === loc.id)?.tags).toEqual([
+      { id: "t-loc", value: "loc", category: null, color: "teal" },
+    ]);
   });
 });
 

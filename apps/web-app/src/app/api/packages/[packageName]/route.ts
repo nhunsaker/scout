@@ -18,6 +18,8 @@ export async function GET(
   if (!pkg) {
     return NextResponse.json({ error: "package not found" }, { status: 404 });
   }
-  const detail = { ...pkg, tags: resolveTags(pkg.packageName, tags) };
+  // Package-only: a package detail page has no single component to check a tag's
+  // component-name/property parts against, so only each tag's package part applies.
+  const detail = { ...pkg, tags: resolveTags({ packageName: pkg.packageName }, tags) };
   return NextResponse.json(PackageDetailSchema.parse(detail));
 }

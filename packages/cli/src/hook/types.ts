@@ -8,6 +8,8 @@ export type HookUse = {
   readonly filePath: string;
   readonly line: number;
   readonly column: number;
+  /** Owners of `filePath`, from the repository's CODEOWNERS file, in CODEOWNERS order. Absent when the file has no owner, or no CODEOWNERS file was read. */
+  readonly codeOwners?: readonly string[];
 };
 
 /**
@@ -29,6 +31,8 @@ export type HookComponent = {
   readonly version: string | null;
   /** Repository declarations whose declaration site is readable: each declared prop's name, in source order. */
   readonly declaredProps?: readonly string[];
+  /** Repository declarations only: owners of `filePath`, from the repository's CODEOWNERS file, in CODEOWNERS order. Absent when the file has no owner, or no CODEOWNERS file was read. Scout sets the "Code owners" custom property from this before `afterScan` runs; call `setMetadata("Code owners", ...)` to override it. */
+  readonly codeOwners?: readonly string[];
   /** Every place this scan found the component rendered. */
   readonly uses: readonly HookUse[];
   /**

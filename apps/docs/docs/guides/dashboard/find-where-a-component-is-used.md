@@ -74,6 +74,10 @@ Three more groups below **Prop values** filter the same way. Press a group's hea
 - **Events**: handlers such as `onClick` in React, and listeners such as `click` for a Vue `@click`.
 - **Attributes**: `data-` and `aria-` attributes, `key`, `ref`, test ids such as `testId`, and HTML attributes such as `id` and `role`.
 
+### Filter by owner
+
+When the scan [attributed code owners](/docs/guides/attribute-code-owners), **Owner** above the file list lists each owner of a file the uses sit in, most used first, plus **No owner** for uses whose file has none, each with how many uses it covers. Tick one or more to keep the uses in those files, and above the list, **By owner** always shows every owner's use count, under your other filters, so you can see at a glance which teams still use the component. A component none of whose uses has an owner shows neither.
+
 ### Search and remove filters
 
 Type into **Search files and props** to keep the uses whose file path or props hold the text, such as `checkout/` or `size=large`. A component with only a few uses has no search box.
@@ -93,6 +97,8 @@ Press a file's row to open it. It lists one line per use, in line order, with th
 Select a line number such as `:42` to open that line in the repo's git host, at the commit that was scanned. A file's name opens the file at its first use. When the scan recorded no git remote, or one the dashboard can't read, both are plain text.
 
 A count such as `+2` beside a prop's value means the file's uses set other values too. Press a column heading (**File**, **Uses** or a prop's name) to sort by it, and press it again to reverse the order.
+
+When the scan attributed code owners, an **Owner** column names the file's first owner, with `+1` for each other one and all of them in its title; a dash means the file has none.
 
 ### Copy the list
 

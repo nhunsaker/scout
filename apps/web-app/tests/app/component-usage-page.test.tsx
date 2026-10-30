@@ -69,9 +69,17 @@ const chipCalls = [
   ...Array.from({ length: 2 }, (_, n) => resolvedAt(chip, `apps/web/src/home/Hero${n}.tsx`, 1, { usedIn: "@example/web" })),
   resolvedAt(chip, "apps/web/src/cart/Cart.tsx", 1, { usedIn: "@example/web" }),
 ];
+const widget = component(packageExport("@example/ui", "Widget"));
+const widgetCalls = [
+  // More than 5 occurrences in total, so the component doesn't fall under the "few calls" threshold that hides the
+  // toolbar (and the Owner filter with it).
+  ...Array.from({ length: 4 }, (_, n) => resolvedAt(widget, "src/checkout/Pay.tsx", n + 1, { codeOwners: ["@acme/checkout", "@acme/payments"] })),
+  resolvedAt(widget, "src/checkout/Cart.tsx", 1, { codeOwners: ["@acme/checkout"] }),
+  resolvedAt(widget, "src/home/Hero.tsx", 1), // unowned
+];
 /** Every component the page tests open. */
-const components: Component[] = [button, tag, card, payForm, payDialog, panel, unused, badge, oldButton, link, chip];
-const occurrences = [...buttonCalls, ...tagCalls, ...cardCalls, ...badgeCalls, ...oldCalls, ...linkCalls, ...chipCalls];
+const components: Component[] = [button, tag, card, payForm, payDialog, panel, unused, badge, oldButton, link, chip, widget];
+const occurrences = [...buttonCalls, ...tagCalls, ...cardCalls, ...badgeCalls, ...oldCalls, ...linkCalls, ...chipCalls, ...widgetCalls];
 
 async function show(componentId: string, search = "") {
   window.history.replaceState(null, "", `/repos/shop/components/${encodeURIComponent(componentId)}${search}`);
@@ -396,5 +404,45 @@ describe.skipIf(!databaseUrl)("component page Usage tab", { timeout: 60_000 }, (
     await show(button.id, "?sel=size~value~large,variant~value~ghost");
     fireEvent.click(screen.getByRole("button", { name: "Remove the filter size = large" }));
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove the filter variant = ghost" }));
+  });
+
+  it("shows no Owner filter or By owner summary for a component none of whose calls carry codeOwners", async () => {
+    await show(button.id);
+    expect(screen.queryByRole("button", { name: /^Owner/ })).toBeNull();
+    expect(screen.queryByText("By owner")).toBeNull();
+  });
+
+  it("shows each file's CODEOWNERS owners compactly in the file table, a dash for an unowned file", async () => {
+    await show(widget.id);
+    const row = (path: string) => screen.getByRole("button", { name: `Uses in ${path}` }).closest("tr") as HTMLElement;
+    expect(within(row("src/checkout/Pay.tsx")).getByTitle("@acme/checkout, @acme/payments")).toHaveTextContent("@acme/checkout+1");
+    expect(within(row("src/checkout/Cart.tsx")).getByText("@acme/checkout")).toBeInTheDocument();
+    expect(within(row("src/home/Hero.tsx")).getByText("–")).toBeInTheDocument();
+  });
+
+  it("lists uses per owner above the file list, most used first, counting a multi-owner file once per owner, unowned under No owner", async () => {
+    await show(widget.id);
+    const summary = screen.getByText("By owner").closest("div") as HTMLElement;
+    const countOf = (label: string) => within(summary).getByText(label).nextSibling?.textContent;
+    expect([countOf("@acme/checkout"), countOf("@acme/payments"), countOf("No owner")]).toEqual(["5", "4", "1"]);
+  });
+
+  it("filters by an owner from the Owner menu, narrows the files and writes the URL", async () => {
+    await show(widget.id);
+    fireEvent.click(screen.getByRole("button", { name: /^Owner/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^@acme\/payments/ }));
+    expect([query().get("owners"), fileButtons()]).toEqual(["@acme/payments", ["Uses in src/checkout/Pay.tsx"]]);
+  });
+
+  it("filters by No owner from the Owner menu", async () => {
+    await show(widget.id);
+    fireEvent.click(screen.getByRole("button", { name: /^Owner/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^No owner/ }));
+    expect([query().get("owners"), fileButtons()]).toEqual(["~none~", ["Uses in src/home/Hero.tsx"]]);
+  });
+
+  it("reproduces an owner-filtered view from its link, picking either of two owners", async () => {
+    await show(widget.id, "?owners=%40acme%2Fcheckout,%40acme%2Fpayments");
+    expect(fileButtons()).toEqual(["Uses in src/checkout/Pay.tsx", "Uses in src/checkout/Cart.tsx"]);
   });
 });

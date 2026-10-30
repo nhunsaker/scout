@@ -42,11 +42,23 @@ describe("toQueryView", () => {
     });
   });
 
-  it("local component has empty package and never a tag", () => {
+  it("local component has empty package, and no tag from a package-only rule", () => {
     const view = toQueryView(component(repoDeclaration("r", "src/X.tsx", "X")), [], [webTag]);
     expect(view.scope).toBe("local");
     expect(view.package).toBe("");
     expect(view.tag).toEqual([]);
+  });
+
+  it("a local component (no package) can still take a tag by its component-name rule (PR-10)", () => {
+    const nameTag: Tag = { id: "legacy", value: "legacy", category: "library", color: "berry", rule: { glob: [], exact: [], component: { glob: ["Old*"], exact: [] } } };
+    const view = toQueryView(component(repoDeclaration("r", "src/OldPanel.tsx", "OldPanel")), [], [nameTag]);
+    expect(view.tag).toEqual(["legacy"]);
+  });
+
+  it("takes a tag by a scanned property, package rule not matching (PR-10)", () => {
+    const dsTag: Tag = { id: "ds", value: "ds", category: "library", color: "berry", rule: { glob: [], exact: [], property: { key: "Owner", equals: ["@acme/ds"] } } };
+    const owned = component(packageExport("unrelated-pkg", "Thing"), { metadata: { Owner: { type: "string", value: "@acme/ds" } } });
+    expect(toQueryView(owned, [], [dsTag]).tag).toEqual(["ds"]);
   });
 
   it("deprecated reflects governance", () => {

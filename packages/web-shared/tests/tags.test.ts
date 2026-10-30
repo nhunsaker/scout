@@ -12,33 +12,42 @@ const legacy: Tag = { id: "legacy", value: "legacy", category: "library", color:
 
 describe("resolveTags", () => {
   it("matches glob", () => {
-    expect(resolveTags("@example/web-button", [web, legacy]).map(t => t.id)).toEqual(["web"]);
+    expect(resolveTags({ packageName: "@example/web-button" }, [web, legacy]).map(t => t.id)).toEqual(["web"]);
   });
   it("matches exact", () => {
-    expect(resolveTags("legacy-design-system", [web, legacy]).map(t => t.id)).toEqual(["legacy"]);
+    expect(resolveTags({ packageName: "legacy-design-system" }, [web, legacy]).map(t => t.id)).toEqual(["legacy"]);
   });
-  it("returns [] for null packageName (local components)", () => {
-    expect(resolveTags(null, [web, legacy])).toEqual([]);
+  it("returns [] for null packageName (local components) with no component/property to go on", () => {
+    expect(resolveTags({ packageName: null }, [web, legacy])).toEqual([]);
   });
   it("returns [] when nothing matches", () => {
-    expect(resolveTags("react", [web, legacy])).toEqual([]);
+    expect(resolveTags({ packageName: "react" }, [web, legacy])).toEqual([]);
   });
   it("can match multiple tags", () => {
     const also: Tag = { id: "all", value: "all", category: "library", color: "teal", rule: { glob: ["*"], exact: [] } };
-    expect(resolveTags("@example/web-button", [web, also]).map(t => t.id).sort()).toEqual(["all", "web"]);
+    expect(resolveTags({ packageName: "@example/web-button" }, [web, also]).map(t => t.id).sort()).toEqual(["all", "web"]);
   });
   it("escapes regex metachars in globs", () => {
     const dotty: Tag = { id: "d", value: "d", category: null, color: "teal", rule: { glob: ["a.b-*"], exact: [] } };
-    expect(resolveTags("axb-1", [dotty])).toEqual([]);   // '.' is literal, not wildcard
-    expect(resolveTags("a.b-1", [dotty]).map(t => t.id)).toEqual(["d"]);
+    expect(resolveTags({ packageName: "axb-1" }, [dotty])).toEqual([]);   // '.' is literal, not wildcard
+    expect(resolveTags({ packageName: "a.b-1" }, [dotty]).map(t => t.id)).toEqual(["d"]);
   });
   it("treats ? as a literal, not a regex quantifier (only * is special)", () => {
     const q: Tag = { id: "q", value: "q", category: null, color: "teal", rule: { glob: ["a?b-*"], exact: [] } };
-    expect(resolveTags("ab-1", [q])).toEqual([]);                 // '?' literal → 'a?b-' required
-    expect(resolveTags("a?b-1", [q]).map(t => t.id)).toEqual(["q"]);
+    expect(resolveTags({ packageName: "ab-1" }, [q])).toEqual([]);                 // '?' literal → 'a?b-' required
+    expect(resolveTags({ packageName: "a?b-1" }, [q]).map(t => t.id)).toEqual(["q"]);
     const lead: Tag = { id: "l", value: "l", category: null, color: "teal", rule: { glob: ["?x"], exact: [] } };
-    expect(() => resolveTags("?x", [lead])).not.toThrow();       // leading ? must not crash new RegExp
-    expect(resolveTags("?x", [lead]).map(t => t.id)).toEqual(["l"]);
+    expect(() => resolveTags({ packageName: "?x" }, [lead])).not.toThrow();       // leading ? must not crash new RegExp
+    expect(resolveTags({ packageName: "?x" }, [lead]).map(t => t.id)).toEqual(["l"]);
+  });
+  it("matches a local component (null packageName) by its component-name part", () => {
+    const old: Tag = { id: "old", value: "old", category: "library", color: "teal", rule: { glob: [], exact: [], component: { glob: ["Old*"], exact: [] } } };
+    expect(resolveTags({ packageName: null, componentName: "OldButton" }, [old]).map(t => t.id)).toEqual(["old"]);
+    expect(resolveTags({ packageName: null, componentName: "NewButton" }, [old])).toEqual([]);
+  });
+  it("matches by property even when the package part also fails", () => {
+    const ds: Tag = { id: "ds", value: "ds", category: "library", color: "teal", rule: { glob: [], exact: [], property: { key: "Owner", equals: ["@acme/ds"] } } };
+    expect(resolveTags({ packageName: "unrelated", metadata: { Owner: { type: "string", value: "@acme/ds" } } }, [ds]).map(t => t.id)).toEqual(["ds"]);
   });
 });
 

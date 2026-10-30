@@ -11,4 +11,5 @@ export type ResolvedConfig = {
   aliases?: Record<string, string[]>;
   install?: string;
   hookScript?: string;
+  codeOwners?: boolean | string;
 };

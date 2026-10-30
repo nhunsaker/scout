@@ -197,10 +197,10 @@ export function reduceComponentRows(
       fileCount: c.stats.fileCount,
       ...(c.usedIn != null ? { usedIn: c.usedIn } : {}),
       deprecated: componentDeprecated(c, governance),
-      tags: resolveTags(packageName, tags),
-      // Carried through unchanged: `artifact` is one repo's one scan, so there is
-      // no cross-repo or cross-scan count to reconcile here (unlike `usage` or
-      // `totalOccurrences` elsewhere in this file, which do add up across scans).
+      // By package, display name and scanned metadata where the scan has them (see `TagMatchTarget`).
+      tags: resolveTags({ packageName, componentName: c.displayName, metadata: c.metadata }, tags),
+      // Carried through unchanged: one repo's one scan has nothing to reconcile across (unlike
+      // `usage` or `totalOccurrences` elsewhere in this file, which do add up across scans).
       ...(c.apiUsage ? { apiUsage: c.apiUsage } : {}),
       ...(c.metadata ? { metadata: c.metadata } : {}),
     });

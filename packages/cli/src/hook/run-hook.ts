@@ -21,6 +21,8 @@ export type RunHookOptions = {
   displayPath: string;
   context: ScoutHookContext;
   log: Logger;
+  /** Repository-relative path → its CODEOWNERS owners (CODEOWNERS order), when a CODEOWNERS file was read this scan. */
+  codeOwnersLookup?: (filePath: string) => readonly string[];
 };
 
 const MAX_STRING_LENGTH = 256;
@@ -72,10 +74,13 @@ function buildHookComponent(
   usesByComponent: ReadonlyMap<string, HookUse[]>,
   metadataByComponent: Map<string, Record<string, MetadataValue>>,
   counts: DroppedCounts,
+  codeOwnersLookup: ((filePath: string) => readonly string[]) | undefined,
 ): HookComponent {
   const identity = deepFreeze(structuredClone(component.identity)) as Identity;
   const uses = Object.freeze((usesByComponent.get(component.id) ?? []).map((u) => Object.freeze({ ...u })));
   const declaredProps = component.declared ? Object.freeze(Object.keys(component.declared.props)) : undefined;
+  const ownerList = identity.kind === "repository-declaration" ? codeOwnersLookup?.(identity.filePath) : undefined;
+  const codeOwners = ownerList && ownerList.length > 0 ? Object.freeze([...ownerList]) : undefined;
 
   const setMetadata = (key: string, value: string | number | boolean | Date): void => {
     if (typeof key !== "string" || !metadataKeyPattern.test(key)) {
@@ -86,7 +91,9 @@ function buildHookComponent(
     if (coerced === null) return;
     let bucket = metadataByComponent.get(component.id);
     if (bucket === undefined) {
-      bucket = {};
+      // Seed from metadata already set on the component (such as "Code
+      // owners") so a hook that sets an unrelated key doesn't wipe it out.
+      bucket = { ...component.metadata };
       metadataByComponent.set(component.id, bucket);
     }
     if (!(key in bucket) && Object.keys(bucket).length >= METADATA_MAX_KEYS) {
@@ -106,6 +113,7 @@ function buildHookComponent(
     ...(identity.kind === "repository-declaration" ? { filePath: identity.filePath } : {}),
     ...(identity.kind === "package-export" ? { packageName: identity.packageName } : {}),
     ...(declaredProps !== undefined ? { declaredProps } : {}),
+    ...(codeOwners !== undefined ? { codeOwners } : {}),
     setMetadata,
   };
 
@@ -185,13 +193,20 @@ export async function runHook(components: Component[], occurrences: readonly Occ
   for (const occurrence of occurrences) {
     if (occurrence.resolution.status !== "resolved") continue;
     const list = usesByComponent.get(occurrence.resolution.componentId) ?? [];
-    list.push({ filePath: occurrence.filePath, line: occurrence.line, column: occurrence.column });
+    list.push({
+      filePath: occurrence.filePath,
+      line: occurrence.line,
+      column: occurrence.column,
+      ...(occurrence.codeOwners && occurrence.codeOwners.length > 0 ? { codeOwners: occurrence.codeOwners } : {}),
+    });
     usesByComponent.set(occurrence.resolution.componentId, list);
   }
 
   const counts = newCounts();
   const metadataByComponent = new Map<string, Record<string, MetadataValue>>();
-  const hookComponents = components.map((component) => buildHookComponent(component, usesByComponent, metadataByComponent, counts));
+  const hookComponents = components.map((component) =>
+    buildHookComponent(component, usesByComponent, metadataByComponent, counts, opts.codeOwnersLookup),
+  );
 
   try {
     await afterScan(Object.freeze(hookComponents), context);

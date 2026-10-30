@@ -9,7 +9,9 @@ export type UsagePick = { prop: string; kind: UsagePickKind; label: string };
 export type UsageSortKey = "uses" | "file" | `prop:${string}`;
 export type UsageSort = { key: UsageSortKey; dir: "asc" | "desc" };
 export const DEFAULT_USAGE_SORT: UsageSort = { key: "uses", dir: "desc" };
-export type UsageFilters = { find: string; area: string | null; picks: readonly UsagePick[]; sort: UsageSort };
+/** The owners pick that means "no CODEOWNERS owner", alongside a real owner's own name. */
+export const NO_OWNER = "";
+export type UsageFilters = { find: string; area: string | null; picks: readonly UsagePick[]; owners: readonly string[]; sort: UsageSort };
 export type UsageInput = Pick<ComponentDetail, "occurrences" | "props" | "events" | "hasDeclaredApi">;
 export type UsagePropInfo = { name: string; group: UsageGroup; status: PropUsage["status"]; declared: DeclaredMeta | null };
 
@@ -27,6 +29,8 @@ type IndexedCall = {
   readonly values: ReadonlyMap<string, SetValue>;
   /** The call's props as its call line shows them. */
   readonly chips: UsageCallChip[];
+  /** The CODEOWNERS owners of the file this call is written in, deduplicated; empty when the file is unowned or the scan doesn't record them. */
+  readonly codeOwners: readonly string[];
 };
 
 /** Built once per component. Fields after `rows` are the implementation's own. */
@@ -42,11 +46,15 @@ export type UsageIndex = {
   readonly calls: readonly IndexedCall[];
   /** Each prop that can be a value column, most set first, with its cell in every file of the component. */
   readonly columns: ReadonlyMap<string, readonly UsageCell[]>;
+  /** At least one call carries a CODEOWNERS owner: the scan records them for this repo. An old scan with none has no owner filter or summary. */
+  readonly hasCodeOwners: boolean;
 };
 export type UsageValue = { kind: UsagePickKind; label: string; count: number; picked: boolean };
 export type UsagePropRow = UsagePropInfo & { set: number; of: number; picked: boolean; values: UsageValue[] };
 export type UsageArea = { key: string; label: string; count: number; picked: boolean };
 export type UsageOwner = { componentId: string; displayName: string };
+/** One CODEOWNERS owner's share of the calls in view, for the owner filter and the By owner summary. `owner` is `NO_OWNER` for the "No owner" bucket. */
+export type UsageCodeOwner = { owner: string; label: string; count: number; picked: boolean };
 /** A prop on a call line. `quiet` marks an event or an attribute. */
 export type UsageCallChip = OccurrencePropChip & { quiet: boolean };
 /** One call site: the stored rows at one file, line and column. */
@@ -85,6 +93,8 @@ export type UsageFile = {
   lines: UsageCallLine[];
   /** The owners every call line has, when they all have the same ones; null otherwise or when they have none. */
   owners: UsageOwner[] | null;
+  /** The file's CODEOWNERS owners (every call in one file shares the same ones); empty when unowned or the scan doesn't record them. */
+  codeOwners: readonly string[];
   cells: Record<string, UsageCell>;
   /** The most used value of each line prop, as JSX on one line: `size="large" isFullWidth`. A prop whose most used value is `{…}` is left off. */
   jsx: string;
@@ -115,6 +125,10 @@ export type UsageView = {
   columns: string[];
   /** File rows start open: 5 calls or fewer are in view. */
   rowsOpen: boolean;
+  /** At least one call in the component carries a CODEOWNERS owner. False hides the owner filter and the By owner summary entirely, including for a scan made before this field existed. */
+  hasCodeOwners: boolean;
+  /** Each CODEOWNERS owner under every other filter, most uses first, then "No owner" when any call is unowned; `NO_OWNER` for that bucket's `owner`. Counts skip the owners filter itself, like a prop's own value counts. */
+  owners: UsageCodeOwner[];
 };
 
 /** At or below this many calls a component counts as having few calls, and while this many or fewer are in view, file rows start open. */
@@ -347,7 +361,10 @@ export function usageIndex(input: UsageInput): UsageIndex {
   const rows = propRows(input);
   const few = input.occurrences.length <= FEW;
   const rankOf = chipRanks(rows);
-  const calls = input.occurrences.map((row) => ({ row, hay: haystack(row), area: byPackage ? (row.usedIn as string) : areaOf(row.filePath, prefix), values: setValues(row), chips: callChips(row, rankOf) }));
+  const calls = input.occurrences.map((row) => ({
+    row, hay: haystack(row), area: byPackage ? (row.usedIn as string) : areaOf(row.filePath, prefix), values: setValues(row), chips: callChips(row, rankOf),
+    codeOwners: row.codeOwners?.length ? [...new Set(row.codeOwners)] : [],
+  }));
   const files = [...filesOf(calls).values()];
   return {
     total: input.occurrences.length,
@@ -358,6 +375,7 @@ export function usageIndex(input: UsageInput): UsageIndex {
     rows,
     calls,
     columns: new Map(columnProps(rows, calls, few).map((prop) => [prop, files.map((list) => cellOf(list, prop))])),
+    hasCodeOwners: calls.some((c) => c.codeOwners.length > 0),
   };
 }
 
@@ -518,6 +536,7 @@ function fileOf(path: string, calls: readonly IndexedCall[], depth: number, colu
     calls: calls.length,
     lines,
     owners: sharedOwners(lines),
+    codeOwners: calls[0]?.codeOwners ?? [],
     cells: Object.fromEntries(columns.map((prop) => [prop, cellOf(calls, prop, picks.get(prop))])),
     jsx: lineProps
       .flatMap((prop) => jsxPart(prop, cellOf(calls, prop).values[0]) ?? [])
@@ -613,9 +632,14 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
   const needle = filters.find.trim().toLowerCase();
   const area = filters.area || null;
   const picks = picksByProp(filters.picks);
+  const ownerPicks = new Set(filters.owners);
+  /** A call passes the owners filter when none is picked, or it carries one of the picked owners, or it's unowned and `NO_OWNER` is picked. */
+  const passesOwners = (codeOwners: readonly string[]): boolean =>
+    ownerPicks.size === 0 || (codeOwners.length ? codeOwners.some((o) => ownerPicks.has(o)) : ownerPicks.has(NO_OWNER));
   const entries = index.rows.map((info): { info: UsagePropInfo; tally: Tally } => ({ info, tally: { extra: 0, set: 0, dynamic: 0, written: new Map() } }));
   const tallies = new Map(entries.map((e) => [e.info.name, e.tally]));
   const areaCounts = new Map<string, number>();
+  const ownerCounts = new Map<string, number>();
   const inView: IndexedCall[] = [];
   const folderOf = new Map<string, string>();
   let shown = 0;
@@ -632,9 +656,14 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
     }
     if (failures > 1) continue;
     const inArea = !area || c.area === area;
+    const ownersOk = passesOwners(c.codeOwners);
     if (failed === null) {
-      areaCounts.set(c.area, (areaCounts.get(c.area) ?? 0) + 1);
+      if (ownersOk) areaCounts.set(c.area, (areaCounts.get(c.area) ?? 0) + 1);
+      if (inArea) {
+        for (const o of c.codeOwners.length ? c.codeOwners : [NO_OWNER]) ownerCounts.set(o, (ownerCounts.get(o) ?? 0) + 1);
+      }
       if (!inArea) continue;
+      if (!ownersOk) continue;
       shown++;
       inView.push(c);
       folderOf.set(c.row.filePath, c.area);
@@ -642,7 +671,7 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
         const tally = tallies.get(name);
         if (tally) count(tally, value);
       }
-    } else if (inArea) {
+    } else if (inArea && ownersOk) {
       const tally = tallies.get(failed);
       if (tally) {
         tally.extra++;
@@ -650,6 +679,11 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
       }
     }
   }
+
+  for (const o of ownerPicks) if (!ownerCounts.has(o)) ownerCounts.set(o, 0);
+  const owners = [...ownerCounts]
+    .map(([owner, n]): UsageCodeOwner => ({ owner, label: owner === NO_OWNER ? "No owner" : owner, count: n, picked: ownerPicks.has(owner) }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
   const props = entries
     .map(({ info, tally }): UsagePropRow => {
@@ -675,7 +709,7 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
     shown,
     files: files.length,
     searched: Boolean(needle),
-    filtered: Boolean(needle) || filters.picks.length > 0 || area !== null,
+    filtered: Boolean(needle) || filters.picks.length > 0 || area !== null || filters.owners.length > 0,
     active: picks.size + (area ? 1 : 0),
     byPackage: index.byPackage,
     areas,
@@ -685,6 +719,8 @@ export function usageView(index: UsageIndex, filters: UsageFilters, columns: rea
     sort,
     columns: [...columns],
     rowsOpen: shown <= FEW,
+    hasCodeOwners: index.hasCodeOwners,
+    owners,
   };
 }
 
@@ -740,6 +776,11 @@ export function togglePick(picks: readonly UsagePick[], pick: UsagePick): UsageP
   const key = valueKey(pick);
   const kept = picks.filter((p) => p.prop !== pick.prop || valueKey(p) !== key);
   return kept.length < picks.length ? kept : [...picks, pick];
+}
+
+/** The picked owners with `owner` removed when it's picked, otherwise added after the others. */
+export function toggleOwnerPick(owners: readonly string[], owner: string): string[] {
+  return owners.includes(owner) ? owners.filter((o) => o !== owner) : [...owners, owner];
 }
 
 /** A list read as one choice: `ghost`, `ghost or outline`, `ghost, outline or link`. */

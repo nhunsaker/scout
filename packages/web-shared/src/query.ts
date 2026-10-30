@@ -5,10 +5,19 @@ import type { ComponentKind, GovernanceRecord, KnownComponentKind, Tag } from ".
 import { componentDeprecated } from "./governance.js";
 import { presentIdentity, type PresentableComponent } from "./present-identity.js";
 import { resolveTags } from "./tags.js";
+import type { RawMetadataRecord } from "./tag-rules.js";
+import { displayNameOf } from "@scoutui/scan-format";
 import { parse, test as liqeTest } from "liqe";
 import type { LiqeQuery } from "liqe";
 
-type Component = PresentableComponent & { stats: { occurrenceCount: number }; writtenNames?: readonly string[] | undefined };
+// `metadata` is optional: a caller with no per-component metadata to hand (none of today's
+// callers lack it, but the type doesn't require it) simply can't match a tag's property part —
+// see `resolveTags`/`TagMatchTarget`.
+type Component = PresentableComponent & {
+  stats: { occurrenceCount: number };
+  writtenNames?: readonly string[] | undefined;
+  metadata?: RawMetadataRecord | undefined;
+};
 
 /** The known friendly kinds `friendlyKind` returns for the four kinds this dashboard knows by name. */
 export type KnownFriendlyKind = "react" | "vue" | "wc" | "undefined-element";
@@ -58,7 +67,7 @@ export function toQueryView(
     package: packageName ?? "",
     deprecated: componentDeprecated(c, governance),
     uses: c.stats.occurrenceCount,
-    tag: resolveTags(packageName, tags).map((t) => t.value),
+    tag: resolveTags({ packageName, componentName: displayNameOf(c), metadata: c.metadata }, tags).map((t) => t.value),
   };
 }
 

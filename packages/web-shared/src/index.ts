@@ -10,6 +10,7 @@ export {
 } from "./read-model-reducers.js";
 export * from "./composition-graph.js";
 export * from "./tags.js";
+export * from "./tag-rules.js";
 export * from "./cohorts.js";
 export * from "./dashboard-render.js";
 export * from "./chart-range.js";

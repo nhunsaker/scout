@@ -160,6 +160,12 @@ const occurrenceSchema = z.object({
   props: z.record(z.string(), plainObject<PropValueState>()),
   events: z.array(z.string()).optional(),
   ownerComponentId: z.string().optional(),
+  /**
+   * Owners of the file this occurrence is written in (CODEOWNERS order), from
+   * the repository's CODEOWNERS file (see the attribute-code-owners guide).
+   * Absent when the file has no owner, or no CODEOWNERS file was read.
+   */
+  codeOwners: z.array(nonEmptyString).optional(),
 });
 export type Occurrence = z.infer<typeof occurrenceSchema>;
 export type ResolvedOccurrence = Occurrence & { resolution: { status: "resolved"; componentId: string } };

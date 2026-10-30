@@ -3,10 +3,11 @@ import { Fragment, useRef, useState, useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
-import type { Tag, TagColour, TagRule } from "@scoutui/web-shared";
-import { TAG_COLOURS, tagMatchesPackage } from "@scoutui/web-shared/client";
+import type { PatternRule, Tag, TagColour, TagRule } from "@scoutui/web-shared";
+import { TAG_COLOURS, patternMatches, tagMatchesPackage } from "@scoutui/web-shared/client";
 import { saveTag, deleteTag } from "@/app/packages/tag-actions";
 import { actionErrorMessage } from "@/lib/action-error";
+import type { PropertyOption } from "@/lib/chart-builder-options";
 import { paletteToken, tagColourName } from "@/lib/chart-palette";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,9 @@ function nextTagColor(existing: Tag[]): TagColour {
   return unused ?? TAG_COLOURS[existing.length % TAG_COLOURS.length] ?? TAG_COLOURS[0];
 }
 
-export function splitPatterns(raw: string): TagRule {
-  const rule: TagRule = { glob: [], exact: [] };
+/** One line or comma-separated entry per package or component-name pattern; `*` makes it a glob. Shared by the Packages and Component names boxes. */
+export function splitPatterns(raw: string): PatternRule {
+  const rule: PatternRule = { glob: [], exact: [] };
   const seen = new Set<string>();
   for (const part of raw.split(/[\n,]/)) {
     const entry = part.trim();
@@ -32,8 +34,37 @@ export function splitPatterns(raw: string): TagRule {
   return rule;
 }
 
+/** Comma-separated values, trimmed, deduped and with blanks dropped. Used for the Property box's "equals" list. */
+function splitCsv(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const entry = part.trim();
+    if (!entry || seen.has(entry)) continue;
+    seen.add(entry);
+    out.push(entry);
+  }
+  return out;
+}
+
 export function packageCount(n: number): string {
   return `${n.toLocaleString()} ${n === 1 ? "package" : "packages"}`;
+}
+
+export function componentCount(n: number): string {
+  return `${n.toLocaleString()} ${n === 1 ? "component" : "components"}`;
+}
+
+/** A line describing a tag's property rule, for the editor's preview; null when the rule sets neither `equals` nor `contains`. */
+export function propertySummary(property: TagRule["property"]): string | null {
+  if (!property) return null;
+  const parts: string[] = [];
+  if (property.equals && property.equals.length > 0) {
+    parts.push(`is ${property.equals.map((v) => `"${v}"`).join(" or ")}`);
+  }
+  if (property.contains) parts.push(`contains "${property.contains}"`);
+  if (parts.length === 0) return null;
+  return `Also matches components where ${property.key} ${parts.join(", or ")}`;
 }
 
 /** Ids of the tag table's column headers, which also label the form's fields. */
@@ -71,11 +102,15 @@ export function TagSwatch({ color, label, className }: { color: TagColour; label
 
 const FIELD = "flex min-w-0 flex-col gap-1.5 md:px-3";
 const SMALL_LABEL = "text-label text-muted-foreground md:hidden";
+// The component and property fields span the row under the table's columns, so no column header names them.
+const ROW_LABEL = "text-label text-muted-foreground";
 
 export function TagEditor({
   tag,
   allTags,
   packageNames,
+  componentNames,
+  propertyOptions,
   onDone,
   onDeleted,
 }: {
@@ -83,6 +118,10 @@ export function TagEditor({
   allTags: Tag[];
   /** Null while scan results are rebuilding. */
   packageNames: string[] | null;
+  /** Display names the latest scans hold, for the Component names preview. Null while scan results are rebuilding. */
+  componentNames: string[] | null;
+  /** Metadata keys the latest scans hold, with their distinct values, for the Property picker. Null while scan results are rebuilding. */
+  propertyOptions: PropertyOption[] | null;
   /** After Save, Create or Cancel. */
   onDone: () => void;
   onDeleted: () => void;
@@ -90,6 +129,12 @@ export function TagEditor({
   const [name, setName] = useState(tag?.value ?? "");
   const [color, setColor] = useState(tag?.color ?? nextTagColor(allTags));
   const [packages, setPackages] = useState(tag ? [...tag.rule.exact, ...tag.rule.glob].join("\n") : "");
+  const [components, setComponents] = useState(
+    tag?.rule.component ? [...tag.rule.component.exact, ...tag.rule.component.glob].join("\n") : "",
+  );
+  const [propertyKey, setPropertyKey] = useState(tag?.rule.property?.key ?? "");
+  const [propertyEquals, setPropertyEquals] = useState(tag?.rule.property?.equals?.join(", ") ?? "");
+  const [propertyContains, setPropertyContains] = useState(tag?.rule.property?.contains ?? "");
   const [nameMissing, setNameMissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -97,9 +142,33 @@ export function TagEditor({
   const deleteRef = useRef<HTMLButtonElement>(null);
 
   const rule = splitPatterns(packages);
-  const draft: Tag = { id: tag?.id ?? "", value: name.trim(), category: "library", color, rule };
+  const componentRule = splitPatterns(components);
+  const hasComponentRule = componentRule.glob.length > 0 || componentRule.exact.length > 0;
+  const propertyKeyTrimmed = propertyKey.trim();
+  const equalsList = splitCsv(propertyEquals);
+  const containsTrimmed = propertyContains.trim();
+  const hasPropertyRule = propertyKeyTrimmed !== "" && (equalsList.length > 0 || containsTrimmed !== "");
+  const property = hasPropertyRule
+    ? { key: propertyKeyTrimmed, ...(equalsList.length > 0 ? { equals: equalsList } : {}), ...(containsTrimmed ? { contains: containsTrimmed } : {}) }
+    : undefined;
+  const draft: Tag = {
+    id: tag?.id ?? "",
+    value: name.trim(),
+    category: "library",
+    color,
+    rule: {
+      glob: rule.glob,
+      exact: rule.exact,
+      ...(hasComponentRule ? { component: componentRule } : {}),
+      ...(property ? { property } : {}),
+    },
+  };
   const matches = packageNames?.filter((n) => tagMatchesPackage(draft, n));
   const shown = matches?.slice(0, 4) ?? [];
+  const componentMatches = hasComponentRule ? componentNames?.filter((n) => patternMatches(componentRule, n)) : undefined;
+  const shownComponents = componentMatches?.slice(0, 4) ?? [];
+  const propertyNote = propertySummary(property);
+  const propertyValues = propertyOptions?.find((o) => o.key === propertyKeyTrimmed)?.values ?? [];
 
   function submit() {
     const value = name.trim();
@@ -114,7 +183,7 @@ export function TagEditor({
         value,
         category: "library",
         color,
-        rule,
+        rule: draft.rule,
       });
       if (res.ok) onDone();
       else setError(actionErrorMessage(res.error, "save this tag", "Couldn't save the tag. Try again."));
@@ -201,24 +270,116 @@ export function TagEditor({
             </p>
           </div>
 
-          {matches ? (
-            <p aria-live="polite" className="min-w-0 text-xs leading-5 tabular-nums md:col-span-2 md:px-3 md:pt-1.5">
-              {matches.length === 0 ? (
-                "Matches no scanned package"
-              ) : (
-                <>
-                  {`Matches ${packageCount(matches.length)}:`}
-                  {shown.map((match, i) => (
-                    <Fragment key={match}>
-                      {" "}
-                      <span className="inline-block max-w-full font-mono text-xs wrap-anywhere text-muted-foreground">
-                        {match}
-                        {i < shown.length - 1 ? "," : matches.length > shown.length ? ", …" : null}
-                      </span>
-                    </Fragment>
+          <div className={cn(FIELD, "md:col-span-full md:grid md:grid-cols-2 md:gap-x-4")}>
+            <div className={FIELD}>
+              <label htmlFor="tag-components" className={ROW_LABEL}>
+                Component names
+              </label>
+              <textarea
+                id="tag-components"
+                value={components}
+                onChange={(e) => setComponents(e.target.value)}
+                rows={2}
+                aria-describedby="tag-components-hint"
+                className="w-full resize-y rounded-lg border border-control bg-transparent px-2.5 py-1.5 font-mono text-base transition-colors sm:text-xs dark:bg-input/30"
+              />
+              <p id="tag-components-hint" className="text-xs text-muted-foreground">
+                One component name or pattern per line, matched by its display name. <span className="font-mono">*</span> matches anything.
+              </p>
+            </div>
+
+            <div className={FIELD}>
+              <span className={ROW_LABEL}>Property</span>
+              <div className="flex flex-col gap-1.5 sm:flex-row">
+                <select
+                  id="tag-property-key"
+                  aria-label="Property key"
+                  value={propertyKey}
+                  onChange={(e) => setPropertyKey(e.target.value)}
+                  className="h-8 w-full rounded-lg border border-control bg-transparent px-2.5 font-mono text-base transition-colors sm:text-xs dark:bg-input/30"
+                >
+                  <option value="">No property</option>
+                  {propertyOptions?.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.key}
+                    </option>
                   ))}
+                </select>
+              </div>
+              {propertyKeyTrimmed ? (
+                <>
+                  <Input
+                    aria-label="Equals (comma-separated)"
+                    placeholder="Equals, comma-separated"
+                    value={propertyEquals}
+                    onChange={(e) => setPropertyEquals(e.target.value)}
+                    list="tag-property-values"
+                    className="h-8 font-mono text-base sm:text-xs"
+                  />
+                  <datalist id="tag-property-values">
+                    {propertyValues.map((v) => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
+                  <Input
+                    aria-label="Contains"
+                    placeholder="Or contains…"
+                    value={propertyContains}
+                    onChange={(e) => setPropertyContains(e.target.value)}
+                    className="h-8 font-mono text-base sm:text-xs"
+                  />
                 </>
-              )}
+              ) : null}
+            </div>
+          </div>
+
+          {matches || componentMatches || propertyNote ? (
+            <p aria-live="polite" className="min-w-0 text-xs leading-5 tabular-nums md:col-span-2 md:px-3 md:pt-1.5">
+              {matches ? (
+                matches.length === 0 ? (
+                  "Matches no scanned package"
+                ) : (
+                  <>
+                    {`Matches ${packageCount(matches.length)}:`}
+                    {shown.map((match, i) => (
+                      <Fragment key={match}>
+                        {" "}
+                        <span className="inline-block max-w-full font-mono text-xs wrap-anywhere text-muted-foreground">
+                          {match}
+                          {i < shown.length - 1 ? "," : matches.length > shown.length ? ", …" : null}
+                        </span>
+                      </Fragment>
+                    ))}
+                  </>
+                )
+              ) : null}
+              {componentMatches ? (
+                <>
+                  {matches ? <br /> : null}
+                  {componentMatches.length === 0 ? (
+                    "Also matches no scanned component"
+                  ) : (
+                    <>
+                      {`Also matches ${componentCount(componentMatches.length)}:`}
+                      {shownComponents.map((match, i) => (
+                        <Fragment key={match}>
+                          {" "}
+                          <span className="inline-block max-w-full font-mono text-xs wrap-anywhere text-muted-foreground">
+                            {match}
+                            {i < shownComponents.length - 1 ? "," : componentMatches.length > shownComponents.length ? ", …" : null}
+                          </span>
+                        </Fragment>
+                      ))}
+                    </>
+                  )}
+                </>
+              ) : null}
+              {propertyNote ? (
+                <>
+                  {matches || componentMatches ? <br /> : null}
+                  {propertyNote}
+                </>
+              ) : null}
             </p>
           ) : null}
 

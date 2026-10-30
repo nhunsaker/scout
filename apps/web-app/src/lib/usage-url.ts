@@ -3,6 +3,7 @@ import { createContext, type Dispatch, type SetStateAction, useCallback, useCont
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   DEFAULT_USAGE_SORT,
+  NO_OWNER,
   type UsageFilters,
   type UsagePick,
   type UsagePickKind,
@@ -59,19 +60,40 @@ const sameText = (q: string) => q;
 const parseArea = (q: string): string | null => q || null;
 const serializeArea = (area: string | null) => area ?? "";
 
-/** The Usage tab's filters, read from and written to the URL (`find`, `area`, `sel`, `sort`). */
+/** The URL token for the "No owner" pick: `NO_OWNER` itself (`""`) can't round-trip through a URL part. */
+const NO_OWNER_TOKEN = "~none~";
+
+/** Reads `owners`: owner names joined by `,`, with `%` and `,` escaped inside each one; `NO_OWNER_TOKEN` reads as `NO_OWNER`. Each owner once. */
+function parseOwners(raw: string): string[] {
+  const owners: string[] = [];
+  for (const part of raw.split(",")) {
+    if (!part) continue;
+    const decoded = part.replace(/%2C|%25/gi, (escaped) => (escaped === "%25" ? "%" : ","));
+    const owner = decoded === NO_OWNER_TOKEN ? NO_OWNER : decoded;
+    if (!owners.includes(owner)) owners.push(owner);
+  }
+  return owners;
+}
+
+function serializeOwners(owners: readonly string[]): string {
+  return owners.map((o) => (o === NO_OWNER ? NO_OWNER_TOKEN : o).replaceAll("%", "%25").replaceAll(",", "%2C")).join(",");
+}
+
+/** The Usage tab's filters, read from and written to the URL (`find`, `area`, `sel`, `owners`, `sort`). */
 export function useUsageFilters() {
   const [find, setFind] = useQuerySyncedState(sameText, sameText, "find");
   const [area, setArea] = useQuerySyncedState(parseArea, serializeArea, "area");
   const [picks, setPicks] = useQuerySyncedState<readonly UsagePick[]>(parseSel, serializeSel, "sel");
+  const [owners, setOwners] = useQuerySyncedState<readonly string[]>(parseOwners, serializeOwners, "owners");
   const [sort, setSort] = useQuerySyncedState(parseSort, serializeSort, "sort");
-  const filters = useMemo<UsageFilters>(() => ({ find, area, picks, sort }), [find, area, picks, sort]);
-  /** Clears the picks and the folder, and keeps the search. */
+  const filters = useMemo<UsageFilters>(() => ({ find, area, picks, owners, sort }), [find, area, picks, owners, sort]);
+  /** Clears the picks, the folder and the owners, and keeps the search. */
   const clearFilters = useCallback(() => {
     setArea(null);
     setPicks([]);
-  }, [setArea, setPicks]);
-  return { filters, setFind, setArea, setPicks, setSort, clearFilters };
+    setOwners([]);
+  }, [setArea, setPicks, setOwners]);
+  return { filters, setFind, setArea, setPicks, setOwners, setSort, clearFilters };
 }
 
 /** `pathname` + `search` with `params` set (null deletes one). */

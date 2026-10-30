@@ -9,7 +9,7 @@ import { reconcileScanJobs } from "@/lib/scan-reconciliation";
 import { baseline } from "../helpers/cli-baseline";
 import { withReadModelDatabase } from "../helpers/read-model-db";
 import { receiveArtifact, sampleArtifact } from "../helpers/scan-artifact";
-import { artifact as v2Artifact, component, packageExport, repoDeclaration } from "../../../../packages/web-shared/tests/helpers/builders.js";
+import { artifact as v2Artifact, component, packageExport, repoDeclaration, resolvedAt } from "../../../../packages/web-shared/tests/helpers/builders.js";
 
 function artifact(scanId = "scan-a", scannedAt = "2026-09-19T00:00:00Z"): ScanArtifact {
   return sampleArtifact({ scanId, scannedAt });
@@ -564,6 +564,33 @@ describe.skipIf(!databaseUrl)("custom properties (metadata) in the read model", 
       const rows = await driver.listComponentsForRepo("no-metadata-repo", "");
       expect(rows.find(r => r.componentId === button.id)?.metadata).toBeUndefined();
       expect(await driver.listMetadataProperties("no-metadata-repo")).toEqual([]);
+    });
+  });
+});
+
+describe.skipIf(!databaseUrl)("CODEOWNERS on occurrences, round-tripped through the read model", { timeout: 30_000 }, () => {
+  const button = component(packageExport("@example/ui", "Button"));
+
+  it("returns an occurrence's codeOwners from the usage read model", async () => {
+    await withReadModelDatabase(async pool => {
+      const owned = resolvedAt(button, "src/checkout/Pay.tsx", 6, { codeOwners: ["@acme/checkout", "@acme/payments"] });
+      const unowned = resolvedAt(button, "src/home/Hero.tsx", 3);
+      const scan = v2Artifact({ scanId: "scan-code-owners", repoId: "owners-repo", components: [button], occurrences: [owned, unowned] });
+      await publishScan(pool, scan, { uploadedByUserId: null });
+      const driver = new PostgresDriver(pool);
+      const occurrences = await driver.getComponentUsage("owners-repo", button.id);
+      expect(occurrences.find(o => o.filePath === "src/checkout/Pay.tsx")?.codeOwners).toEqual(["@acme/checkout", "@acme/payments"]);
+      expect(occurrences.find(o => o.filePath === "src/home/Hero.tsx")?.codeOwners).toBeUndefined();
+    });
+  });
+
+  it("reprojects an older stored scan with no codeOwners field without failing: its occurrences simply carry none", async () => {
+    await withReadModelDatabase(async pool => {
+      const scan = v2Artifact({ scanId: "scan-no-code-owners", repoId: "no-owners-repo", components: [button], occurrences: [resolvedAt(button, "src/App.tsx")] });
+      await publishScan(pool, scan, { uploadedByUserId: null });
+      const driver = new PostgresDriver(pool);
+      const occurrences = await driver.getComponentUsage("no-owners-repo", button.id);
+      expect(occurrences[0]?.codeOwners).toBeUndefined();
     });
   });
 });

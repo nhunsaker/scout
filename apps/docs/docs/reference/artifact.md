@@ -217,6 +217,8 @@ Keys are `components[].id` values. Look them up in `components[]` to get names. 
 
 Custom properties a [hook script](/docs/guides/add-custom-properties) set on this component with `setMetadata`, such as its owner or whether it has stories. Keyed by the property's name: letters, digits, spaces, `.`, `_` and `-`, starting with a letter, up to 64 characters, at most 32 keys per component.
 
+A component defined in the repo also gets a `"Code owners"` entry here, set from its declaration file's `CODEOWNERS` owners before any hook script runs, unless [`codeOwners`](/docs/reference/config#attribution-fields) is off or found no owner. A hook script can read it from `component.codeOwners` and override it with `setMetadata("Code owners", ...)`. See [Attribute code owners](/docs/guides/attribute-code-owners).
+
 | `type` | Other fields | Value |
 | --- | --- | --- |
 | `"string"` | `value: string` | Up to 256 characters. |
@@ -251,6 +253,7 @@ One entry per [use](/docs/reference/glossary#use): a place in the code where a c
 | `props` | object | The value passed for each prop here. See [Prop values at one place](#occurrence-props). |
 | `events` | `string[]` \| absent | Vue event listeners bound here, such as `remove` for `@remove`. Handlers passed as props, such as `onClick`, stay in `props`. Absent when none are bound. |
 | `ownerComponentId` | `string` \| absent | The `components[].id` of the component whose code contains this use. Absent outside any component. |
+| `codeOwners` | `string[]` \| absent | Owners of `filePath`, from the repository's `CODEOWNERS` file, in the order the file lists them. Absent when the file has no owner, or [`codeOwners`](/docs/reference/config#attribution-fields) is off or found no file. See [Attribute code owners](/docs/guides/attribute-code-owners). |
 
 ```json title="An occurrences[] entry"
 {

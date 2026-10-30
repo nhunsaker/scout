@@ -1354,6 +1354,13 @@
           },
           "ownerComponentId": {
             "type": "string"
+          },
+          "codeOwners": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [

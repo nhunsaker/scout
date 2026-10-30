@@ -18,6 +18,8 @@ const acme: Tag = {
   rule: { glob: ["@acme/*"], exact: ["legacy-kit"] },
 };
 const packageNames = ["@acme/icons", "@acme/layouts", "legacy-kit", "react"];
+const componentNames = ["OldButton", "OldCard", "NewButton"];
+const propertyOptions = [{ key: "Owner", values: ["@acme/ds", "@acme/platform"] }];
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -78,6 +80,20 @@ describe("TagsPanel", () => {
     render(<TagsPanel allTags={[libs]} packageNames={packageNames} />);
     for (const entry of ["p1", "p2", "p3", "p4", "p5*"]) expect(screen.getByText(entry)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /more packages/ })).toBeNull();
+  });
+
+  it.each([
+    [{ glob: [], exact: [], component: { glob: ["Legacy*"], exact: ["OldButton"] } }, ["Components: OldButton, Legacy*"]],
+    [{ glob: [], exact: [], property: { key: "Owner", equals: ["@example/ds", "@example/web"] } }, ["Property: Owner is @example/ds or @example/web"]],
+    [{ glob: [], exact: [], property: { key: "Owner", contains: "ds" } }, ["Property: Owner contains “ds”"]],
+  ] as const)("lists the component and property parts of a tag's rule", (rule, lines) => {
+    render(<TagsPanel allTags={[{ ...acme, rule: rule as unknown as Tag["rule"] }]} packageNames={packageNames} />);
+    for (const line of lines) expect(screen.getAllByText((_, el) => el?.tagName === "SPAN" && el.textContent === line).length).toBeGreaterThan(0);
+  });
+
+  it("lists no component or property line for a package-only tag", () => {
+    render(<TagsPanel allTags={[acme]} packageNames={packageNames} />);
+    expect(screen.queryByText(/^(Components|Property):/)).not.toBeInTheDocument();
   });
 
   it("says when a tag matches no scanned package", () => {
@@ -168,6 +184,58 @@ describe("TagsPanel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Enter a name.");
     const { saveTag } = await import("@/app/packages/tag-actions");
     expect(saveTag).not.toHaveBeenCalled();
+  });
+
+  it("previews what the Component names box matches while you type", () => {
+    render(<TagsPanel allTags={[]} packageNames={null} componentNames={componentNames} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Component names" }), { target: { value: "Old*" } });
+    expect(screen.getByText(/^Also matches 2 components:/)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Component names" }), { target: { value: "Nothing*" } });
+    expect(screen.getByText("Also matches no scanned component")).toBeInTheDocument();
+  });
+
+  it("saves a component-name rule alongside the package rule", async () => {
+    render(<TagsPanel allTags={[]} packageNames={packageNames} componentNames={componentNames} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "legacy" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Component names" }), { target: { value: "Old*" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    const { saveTag } = await import("@/app/packages/tag-actions");
+    await vi.waitFor(() =>
+      expect(saveTag).toHaveBeenCalledWith(
+        expect.objectContaining({ value: "legacy", rule: { glob: [], exact: [], component: { glob: ["Old*"], exact: [] } } }),
+      ),
+    );
+  });
+
+  it("picks a property key, describes the Equals rule in the preview, and saves it", async () => {
+    render(<TagsPanel allTags={[]} packageNames={null} propertyOptions={propertyOptions} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "design-system" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Property key" }), { target: { value: "Owner" } });
+    // The Equals box has a `list` attribute (a datalist of known values), which gives it role "combobox", not "textbox".
+    fireEvent.change(screen.getByRole("combobox", { name: "Equals (comma-separated)" }), { target: { value: "@acme/ds" } });
+    expect(screen.getByText('Also matches components where Owner is "@acme/ds"')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    const { saveTag } = await import("@/app/packages/tag-actions");
+    await vi.waitFor(() =>
+      expect(saveTag).toHaveBeenCalledWith(
+        expect.objectContaining({ value: "design-system", rule: { glob: [], exact: [], property: { key: "Owner", equals: ["@acme/ds"] } } }),
+      ),
+    );
+  });
+
+  it("leaves component and property out of a saved rule when neither box was used", async () => {
+    render(<TagsPanel allTags={[]} packageNames={packageNames} componentNames={componentNames} propertyOptions={propertyOptions} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "web" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Packages" }), { target: { value: "@acme/*" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    const { saveTag } = await import("@/app/packages/tag-actions");
+    await vi.waitFor(() =>
+      expect(saveTag).toHaveBeenCalledWith(expect.objectContaining({ value: "web", rule: { glob: ["@acme/*"], exact: [] } })),
+    );
   });
 });
 

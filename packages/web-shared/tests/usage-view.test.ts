@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OccurrencePropChip, OccurrenceRow, PropUsage } from "../src/dto.js";
-import { callJsx, cellTitle, copyListText, countText, DEFAULT_USAGE_SORT, emptyText, filterText, nextUsageSort, oneFolderText, pickGroups, propSections, togglePick, usageDue, usageIndex, usageView, valueColumns, valueLabel, valueSpeech, whereHeading, type CopyListInput, type UsageDue, type UsageFilters, type UsageInput, type UsagePick, type UsageSortKey, type UsageView } from "../src/usage-view.js";
+import { callJsx, cellTitle, copyListText, countText, DEFAULT_USAGE_SORT, emptyText, filterText, nextUsageSort, oneFolderText, pickGroups, propSections, togglePick, toggleOwnerPick, usageDue, usageIndex, usageView, valueColumns, valueLabel, valueSpeech, whereHeading, type CopyListInput, type UsageDue, type UsageFilters, type UsageInput, type UsagePick, type UsageSortKey, type UsageView } from "../src/usage-view.js";
 
 const lit = (name: string, value: string): OccurrencePropChip => ({ kind: "literal", name, value });
 const ref = (name: string, target: string): OccurrencePropChip => ({ kind: "reference", name, ref: target });
@@ -18,7 +18,7 @@ function input(occurrences: OccurrenceRow[], props?: PropUsage[], events: string
   return { occurrences, props: names, events: events.map(name => ({ name, boundCount: 1 })), hasDeclaredApi: names.some(p => p.status !== null) };
 }
 function view(given: UsageInput, filters: Partial<UsageFilters> = {}): UsageView {
-  return usageView(usageIndex(given), { find: "", area: null, picks: [], sort: DEFAULT_USAGE_SORT, ...filters });
+  return usageView(usageIndex(given), { find: "", area: null, picks: [], owners: [], sort: DEFAULT_USAGE_SORT, ...filters });
 }
 const pick = (name: string, kind: UsagePick["kind"], label = ""): UsagePick => ({ prop: name, kind, label });
 const valuesOf = (v: UsageView, name: string) => v.props.find(row => row.name === name)?.values.map(value => [value.kind, value.label, value.count]);
@@ -180,6 +180,52 @@ describe("usageView folders", () => {
   });
 });
 
+describe("usageView CODEOWNERS", () => {
+  const owned = (filePath: string, line: number, codeOwners?: string[]) => call(filePath, line, [], codeOwners ? { codeOwners } : {});
+  const mixed = input([owned("a.tsx", 1, ["@ds/core"]), owned("b.tsx", 1, ["@ds/core", "@ds/forms"]), owned("c.tsx", 1, ["@ds/forms"]), owned("d.tsx", 1)]);
+
+  it("flags no owner data for a scan that doesn't record codeOwners, so pages hide the owner filter and summary", () => {
+    const v = view(input([call("a.tsx", 1), call("b.tsx", 1)]));
+    expect(v.hasCodeOwners).toBe(false);
+  });
+
+  it("counts each file once per owner, sorted by uses then owner, with unowned under No owner", () => {
+    expect(view(mixed).owners.map(o => [o.owner, o.label, o.count, o.picked])).toEqual([
+      ["@ds/core", "@ds/core", 2, false],
+      ["@ds/forms", "@ds/forms", 2, false],
+      ["", "No owner", 1, false],
+    ]);
+    expect(view(mixed).hasCodeOwners).toBe(true);
+  });
+
+  it("filters to calls carrying any of the picked owners", () => {
+    expect(view(mixed, { owners: ["@ds/forms"] }).shown).toBe(2);
+    expect(view(mixed, { owners: ["@ds/core", "@ds/forms"] }).shown).toBe(3);
+  });
+
+  it("filters to unowned calls with the No owner pick", () => {
+    expect(view(mixed, { owners: [""] }).shown).toBe(1);
+  });
+
+  it("counts owners under every filter but the owners filter itself, a picked owner left at 0 staying", () => {
+    expect(view(mixed, { owners: ["@ds/core"] }).owners.map(o => [o.owner, o.count])).toEqual([["@ds/core", 2], ["@ds/forms", 2], ["", 1]]);
+    expect(view(mixed, { owners: ["@ds/core"], picks: [] }).owners.find(o => o.owner === "@ds/core")?.picked).toBe(true);
+    const narrowed = view(input([owned("a.tsx", 1, ["@ds/core"]), owned("e.tsx", 1, ["@ds/only-e"])]), { owners: ["@ds/only-e"], area: "." });
+    expect(narrowed.owners.map(o => [o.owner, o.count])).toEqual([["@ds/core", 1], ["@ds/only-e", 1]]);
+  });
+
+  it("gives a component's File table rows their file's codeOwners", () => {
+    const sections = viewWith(mixed).sections;
+    const codeOwnersOf = (path: string) => sections.flatMap(s => s.files).find(f => f.path === path)?.codeOwners;
+    expect([codeOwnersOf("a.tsx"), codeOwnersOf("b.tsx"), codeOwnersOf("d.tsx")]).toEqual([["@ds/core"], ["@ds/core", "@ds/forms"], []]);
+  });
+
+  it("toggleOwnerPick adds an unpicked owner and removes a picked one", () => {
+    expect(toggleOwnerPick([], "@ds/core")).toEqual(["@ds/core"]);
+    expect(toggleOwnerPick(["@ds/core", ""], "@ds/core")).toEqual([""]);
+  });
+});
+
 describe("usageView by package", () => {
   const at = (filePath: string, usedIn?: string) => call(filePath, 1, [], usedIn !== undefined ? { usedIn } : {});
   const spread = input([at("apps/web/src/App.tsx", "@example/web"), at("apps/web/src/Nav.tsx", "@example/web"), at("scripts/preview.tsx", "whole-repo-scope")]);
@@ -295,7 +341,7 @@ describe("value and call text", () => {
 
 const columnsFor = (given: UsageInput, picks: UsagePick[] = [], room = 1000) => valueColumns(usageIndex(given), picks, room, 7).map(c => c.prop);
 function viewWith(given: UsageInput, filters: Partial<UsageFilters> = {}, columns: string[] = []): UsageView {
-  return usageView(usageIndex(given), { find: "", area: null, picks: [], sort: DEFAULT_USAGE_SORT, ...filters }, columns);
+  return usageView(usageIndex(given), { find: "", area: null, picks: [], owners: [], sort: DEFAULT_USAGE_SORT, ...filters }, columns);
 }
 const files = (v: UsageView) => v.sections.flatMap(s => s.files.map(f => `${f.lead}${f.base}`));
 const owned = (id: string) => ({ owner: { componentId: id, displayName: id.toUpperCase() } });
@@ -451,7 +497,7 @@ describe("value columns", () => {
     ["nothing for a prop the file doesn't set", [call("src/A.tsx", 1)], ["size"], ""],
     ["each prop in the order given, joined by spaces", [call("src/A.tsx", 1, [lit("tone", "red"), lit("size", "large")])], ["size", "tone"], 'size="large" tone="red"'],
   ])("a file's JSX line shows %s", (_title, given, lineProps, jsx) => {
-    const v = usageView(usageIndex(input(given)), { find: "", area: null, picks: [], sort: DEFAULT_USAGE_SORT }, [], lineProps);
+    const v = usageView(usageIndex(input(given)), { find: "", area: null, picks: [], owners: [], sort: DEFAULT_USAGE_SORT }, [], lineProps);
     expect(v.sections[0]?.files[0]?.jsx).toBe(jsx);
   });
 

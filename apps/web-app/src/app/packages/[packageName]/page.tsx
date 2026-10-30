@@ -40,7 +40,9 @@ export default async function PackageDetailPage({
       heading={{ title: decodeURIComponent(packageName), code: true, back: { href: "/packages", label: "Packages" } }} />
   );
   const { pkg, tags, governance } = page.value;
-  const detail = pkg ? { ...pkg, tags: resolveTags(pkg.packageName, tags) } : pkg;
+  // Package-only: a package detail page has no single component to check a tag's
+  // component-name/property parts against, so only each tag's package part applies.
+  const detail = pkg ? { ...pkg, tags: resolveTags({ packageName: pkg.packageName }, tags) } : pkg;
   if (!detail) notFound();
 
   const decodedName = decodeURIComponent(packageName);

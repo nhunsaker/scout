@@ -1,8 +1,10 @@
 "use client";
-import { AlertTriangle, Check, Copy, ListFilter, Search, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Copy, ListFilter, Search, Users, X } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
-import { countText, filterText, pickGroups, plural, type UsageDue, type UsagePick, type UsageView, valueLabel, valueSpeech } from "@scoutui/web-shared/client";
+import { countText, filterText, NO_OWNER, pickGroups, plural, type UsageCodeOwner, type UsageDue, type UsagePick, type UsageView, valueLabel, valueSpeech } from "@scoutui/web-shared/client";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /** From this file list width the search box's placeholder says what it searches. */
@@ -27,6 +29,7 @@ export function UsageToolbar({
   barRef,
   searchRef,
   onFilter,
+  onOwner,
   onClearFilters,
   onCopy,
   copied,
@@ -42,6 +45,8 @@ export function UsageToolbar({
   barRef: RefObject<HTMLDivElement | null>;
   searchRef: RefObject<HTMLInputElement | null>;
   onFilter: () => void;
+  /** An owner row was pressed. */
+  onOwner: (owner: string) => void;
   onClearFilters: () => void;
   onCopy: () => void;
   copied: boolean;
@@ -70,6 +75,7 @@ export function UsageToolbar({
               </span>
             ) : null}
           </Button>
+          {view.hasCodeOwners ? <OwnerFilter owners={view.owners} onOwner={onOwner} /> : null}
         </>
       )}
       {/* Below sm, Clear filters sits after the pills instead. */}
@@ -82,6 +88,76 @@ export function UsageToolbar({
         <CountText view={view} due={due} />
         <CopyListButton files={view.files} folder={null} disabled={view.shown === 0} copied={copied} onCopy={onCopy} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The owner filter: a popover listing each CODEOWNERS owner under the other filters, plus "No owner", to tick one or
+ * more. Its badge counts the owners picked.
+ */
+function OwnerFilter({ owners, onOwner }: { owners: readonly UsageCodeOwner[]; onOwner: (owner: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const picked = owners.filter((o) => o.picked).length;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button variant="outline" size="sm" className="shrink-0 cursor-pointer gap-1.5 font-normal motion-reduce:transition-none">
+            <Users aria-hidden data-icon="inline-start" />
+            Owner
+            {picked > 0 ? (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold tabular-nums text-foreground">
+                <span className="sr-only">, </span>
+                {picked}
+                <span className="sr-only"> active</span>
+              </span>
+            ) : null}
+            <ChevronDown aria-hidden className="size-3.5 text-muted-foreground" />
+          </Button>
+        }
+      />
+      <PopoverContent align="start" className="w-56 gap-0 p-0">
+        <ul className="flex max-h-64 flex-col overflow-y-auto py-1">
+          {owners.length === 0 ? (
+            <li className="px-3 py-2 text-xs text-muted-foreground">No owners match the other filters.</li>
+          ) : (
+            owners.map((o) => (
+              <li key={o.owner}>
+                <button
+                  type="button"
+                  aria-pressed={o.picked}
+                  onClick={() => onOwner(o.owner)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+                >
+                  <Checkbox checked={o.picked} tabIndex={-1} aria-hidden className="pointer-events-none" />
+                  <span className={cn("min-w-0 flex-1 truncate", o.owner !== NO_OWNER && "font-mono text-xs")}>{o.label}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{o.count.toLocaleString()}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * The uses per CODEOWNERS owner, most used first, above the file list: a quick read of which teams still use this
+ * component. Shown only while the component carries owner data.
+ */
+export function OwnerSummary({ owners }: { owners: readonly UsageCodeOwner[] }) {
+  if (owners.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b bg-card px-3 py-2 text-xs sm:px-4">
+      <h3 className="text-label shrink-0 text-muted-foreground">By owner</h3>
+      {owners.map((o) => (
+        <span key={o.owner} className="whitespace-nowrap">
+          <span className={cn(o.owner === NO_OWNER ? "text-muted-foreground" : "font-mono text-foreground")}>{o.label}</span>
+          <span className="ml-1.5 font-medium tabular-nums text-foreground">{o.count.toLocaleString()}</span>
+        </span>
+      ))}
     </div>
   );
 }
