@@ -29,6 +29,12 @@ const local = (shape: string, file: string, exportName: string) => ({
 });
 const tag = (tagName: string) => ({ kind: "tag", tagName });
 const imported = (specifier: string, name: string) => ({ kind: "import", specifier, name });
+const pkg = (packageName: string, publicEntry: string, exportName: string) => ({
+  kind: "package-export",
+  packageName,
+  publicEntry,
+  exportName,
+});
 
 /** One expected occurrence; `at` is `<file>:<line>:<column>` within its shape. */
 function row(
@@ -313,6 +319,35 @@ describe.each(VERSIONS)("integration: angular-app fixture (Angular %d)", (ngVers
     });
   });
 
+  describe("library-components", () => {
+    const S = "library-components";
+    const appComponent = local(S, "app.component.ts", "AppComponent");
+    const exCard = pkg("@example/ng-ui", "card", "ExCard");
+    const exButton = pkg("@example/ng-ui", "", "ExButton");
+
+    it("resolves a component declared in an installed library's subpath entry, crediting the subpath it was imported from", () => {
+      expect(rendersIn(S)).toEqual([
+        row(
+          "app.component.html:1:1",
+          exCard,
+          appComponent,
+          [imported("@example/ng-ui/card", "ExCard")],
+          {
+            elevation: { tier: "written", value: "2" },
+            title: { tier: "reference", ref: "t" },
+          },
+          ["closed"],
+        ),
+        row("app.component.html:2:1", exButton, appComponent, [imported("@example/ng-ui", "ExButton")]),
+      ]);
+    });
+
+    it("declares the library component's inputs by their template-facing alias, the same as a repo component", () => {
+      expect(componentOf(exCard)?.declared).toBeUndefined(); // a package component has no repo-declared API; its props come from the library's own typings
+      expect(componentOf(exCard)?.framework).toBe("angular");
+    });
+  });
+
   describe("every declared component gets a row, none it shouldn't", () => {
     it("lists every repository-declaration that renders or is rendered in this fixture", () => {
       // selector-conflict's three files are deliberately absent: an
@@ -333,6 +368,7 @@ describe.each(VERSIONS)("integration: angular-app fixture (Angular %d)", (ngVers
           "src/decorator-io/toggle.component.ts",
           "src/inline-template/card.component.ts",
           "src/inline-template/tag.component.ts",
+          "src/library-components/app.component.ts",
           "src/ng-content-projection/badge.component.ts",
           "src/ng-content-projection/frame.component.ts",
           "src/ng-content-projection/projection-page.component.ts",

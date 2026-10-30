@@ -23,6 +23,7 @@ import {
   type PendingAngularFile,
 } from "../emit-angular-file.js";
 import { detectAngularBootstrap, detectAngularComponents, detectAngularModules } from "../local-index/detect-angular.js";
+import { buildAngularLibraryIndex } from "../scan/angular-library-index.js";
 import { createProgress, startPhase } from "../util/progress.js";
 import { DEFAULT_INCLUDE, excludeEntriesMatchingNothing, nestedRepositoriesMatched, walkFiles, type WalkOptions } from "../walker/files.js";
 import { createImportResolver } from "../walker/resolve-import.js";
@@ -603,8 +604,12 @@ export async function scanRepository(input: {
       collector.emit(missing);
       log.warn(formatWarning(missing));
     }
-    const index = compiler === null ? undefined : buildAngularSelectorIndex(compiler, pendingAngular);
-    const scopes = buildModuleScopes(pendingAngular);
+    // Installed libraries the Angular files import from describe their components in their typings.
+    const librarySpecifiers = new Set(pendingAngular.flatMap((p) => p.imports.map((i) => i.specifier)).filter((s) => !s.startsWith(".") && !s.startsWith("/")));
+    const library = compiler === null ? undefined : buildAngularLibraryIndex({ configDir: cfg.configDir, specifiers: librarySpecifiers });
+    for (const u of library?.unreadable ?? []) scanWarning(`Couldn't read the Angular components ${u.specifier} declares (${u.reason}), so its components aren't counted.`);
+    const index = compiler === null ? undefined : buildAngularSelectorIndex(compiler, pendingAngular, library);
+    const scopes = buildModuleScopes(pendingAngular, library);
     const templateBuilders = new Map<string, ReturnType<typeof graphBuilder.beginFile>>();
     for (const pending of pendingAngular) {
       try {
