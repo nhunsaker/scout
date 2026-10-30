@@ -63,6 +63,22 @@ describe("resolveCohort", () => {
     expect(resolveCohort({ kind: "tag", tagId: "web" }, a, [webTag])).toEqual({ occurrences: 16, usedKeys: new Set([webButton.id, webCard.id, webTab.id]) });
   });
 
+  it("tag: also matches a component by its display name, package not matching (PR-10 component rule)", () => {
+    const oldWidget = component(packageExport("unrelated-pkg", "OldWidget"));
+    const newWidget = component(packageExport("unrelated-pkg", "NewWidget"));
+    const b = scan("r2", t1, [[oldWidget, 3], [newWidget, 4]]);
+    const nameTag: Tag = { id: "old", value: "old", category: "library", color: "teal", rule: { glob: [], exact: [], component: { glob: ["Old*"], exact: [] } } };
+    expect(resolveCohort({ kind: "tag", tagId: "old" }, b, [nameTag])).toEqual({ occurrences: 3, usedKeys: new Set([oldWidget.id]) });
+  });
+
+  it("tag: also matches a component by a scanned property (PR-10 property rule)", () => {
+    const owned = component(packageExport("unrelated-pkg", "Thing"), { metadata: { Owner: { type: "string", value: "@acme/ds" } } });
+    const unowned = component(packageExport("unrelated-pkg", "OtherThing"));
+    const b = scan("r2", t1, [[owned, 5], [unowned, 6]]);
+    const dsTag: Tag = { id: "ds", value: "ds", category: "library", color: "teal", rule: { glob: [], exact: [], property: { key: "Owner", equals: ["@acme/ds"] } } };
+    expect(resolveCohort({ kind: "tag", tagId: "ds" }, b, [dsTag])).toEqual({ occurrences: 5, usedKeys: new Set([owned.id]) });
+  });
+
   it("returns zero for a cohort with no matches", () => {
     expect(resolveCohort({ kind: "package", packageName: "nope" }, a, [webTag])).toEqual({ occurrences: 0, usedKeys: new Set() });
   });

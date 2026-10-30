@@ -74,12 +74,17 @@ async function writeHookScript(source: string, ext = ".mjs"): Promise<{ path: st
 
 const context = { repoId: "r", commit: "c", configDir: "/repo", repoRoot: "/repo" };
 
-async function runWithScript(source: string, components: Component[], occurrences: Occurrence[] = []): Promise<string> {
+async function runWithScript(
+  source: string,
+  components: Component[],
+  occurrences: Occurrence[] = [],
+  opts: { codeOwnersLookup?: (filePath: string) => readonly string[] } = {},
+): Promise<string> {
   const { path, dir } = await writeHookScript(source);
   const log = new Logger({ color: plainColor });
   try {
     return await captureStderr(async () => {
-      await runHook(components, occurrences, { scriptPath: path, displayPath: "hook.mjs", context, log });
+      await runHook(components, occurrences, { scriptPath: path, displayPath: "hook.mjs", context, log, ...opts });
     });
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -208,5 +213,93 @@ describe("runHook: the HookComponent view", () => {
       components,
     );
     expect((globalThis as { __identityFrozenThrew?: boolean }).__identityFrozenThrew).toBe(true);
+  });
+});
+
+describe("runHook: codeOwnersLookup", () => {
+  const lookup = (filePath: string): readonly string[] =>
+    filePath === "src/A.tsx" ? ["@owner-a"] : filePath === "src/App.tsx" ? ["@owner-app"] : [];
+
+  it("exposes codeOwners on a repository declaration's own file, from codeOwnersLookup", async () => {
+    const components = [repoComponent("c1", "src/A.tsx")];
+    await runWithScript("export default { afterScan(cs) { globalThis.__seen3 = cs[0]; } };", components, [], {
+      codeOwnersLookup: lookup,
+    });
+    const seen = (globalThis as { __seen3?: HookComponent }).__seen3;
+    expect(seen?.codeOwners).toEqual(["@owner-a"]);
+  });
+
+  it("leaves codeOwners absent when codeOwnersLookup returns no owners for the file", async () => {
+    const components = [repoComponent("c1", "src/Unowned.tsx")];
+    await runWithScript("export default { afterScan(cs) { globalThis.__seen4 = cs[0]; } };", components, [], {
+      codeOwnersLookup: lookup,
+    });
+    const seen = (globalThis as { __seen4?: HookComponent }).__seen4;
+    expect(seen?.codeOwners).toBeUndefined();
+  });
+
+  it("leaves codeOwners absent on a package export, which has no filePath to look up", async () => {
+    const components = [packageComponent("c1")];
+    await runWithScript("export default { afterScan(cs) { globalThis.__seen5 = cs[0]; } };", components, [], {
+      codeOwnersLookup: lookup,
+    });
+    const seen = (globalThis as { __seen5?: HookComponent }).__seen5;
+    expect(seen?.codeOwners).toBeUndefined();
+  });
+
+  it("carries codeOwners from each occurrence onto its HookUse", async () => {
+    const components = [repoComponent("c1", "src/A.tsx")];
+    const occurrences = [
+      { ...resolvedOccurrence("c1", "src/App.tsx", 10), codeOwners: ["@owner-app"] },
+      resolvedOccurrence("c1", "src/Other.tsx", 20), // no CODEOWNERS owner for this file
+    ];
+    await runWithScript("export default { afterScan(cs) { globalThis.__seen6 = cs[0]; } };", components, occurrences, {
+      codeOwnersLookup: lookup,
+    });
+    const seen = (globalThis as { __seen6?: HookComponent }).__seen6;
+    expect(seen?.uses).toEqual([
+      { filePath: "src/App.tsx", line: 10, column: 1, codeOwners: ["@owner-app"] },
+      { filePath: "src/Other.tsx", line: 20, column: 1 },
+    ]);
+  });
+});
+
+describe("runHook: metadata already set before afterScan runs", () => {
+  it("is left alone when the hook sets an unrelated key", async () => {
+    const component = repoComponent("c1", "src/A.tsx");
+    component.metadata = { "Code owners": { type: "string", value: "@owner-a" } };
+    const components = [component];
+    await runWithScript(`export default { afterScan(cs) { cs[0].setMetadata("hasStories", true); } };`, components);
+    expect(components[0]?.metadata).toEqual({
+      "Code owners": { type: "string", value: "@owner-a" },
+      hasStories: { type: "boolean", value: true },
+    });
+  });
+
+  it("is overridden when the hook sets that same key", async () => {
+    const component = repoComponent("c1", "src/A.tsx");
+    component.metadata = { "Code owners": { type: "string", value: "@owner-a" } };
+    const components = [component];
+    await runWithScript(`export default { afterScan(cs) { cs[0].setMetadata("Code owners", "@overridden"); } };`, components);
+    expect(components[0]?.metadata).toEqual({ "Code owners": { type: "string", value: "@overridden" } });
+  });
+
+  it("counts pre-existing keys against the 32-key limit", async () => {
+    const component = repoComponent("c1", "src/A.tsx");
+    component.metadata = { "Code owners": { type: "string", value: "@owner-a" } };
+    const components = [component];
+    const stderr = await runWithScript(
+      `export default { afterScan(cs) {
+        const c = cs[0];
+        for (let i = 0; i < 32; i++) c.setMetadata("k" + i, i);
+      } };`,
+      components,
+    );
+    const metadata = components[0]?.metadata ?? {};
+    // "Code owners" plus 31 of the 32 new keys fill the budget; the 32nd new key is dropped.
+    expect(Object.keys(metadata)).toHaveLength(32);
+    expect(metadata["Code owners"]).toEqual({ type: "string", value: "@owner-a" });
+    expect(metadata.k31).toBeUndefined();
+    expect(stderr).toContain("1 custom property dropped: its component already has 32 keys, the limit.");
   });
 });

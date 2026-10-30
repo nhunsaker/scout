@@ -16,11 +16,12 @@ export default async function GovernancePage() {
   if (!can(await identify({ browser: true }), "edit")) {
     return <EmptyState titleAs="h1" title="Only Editors can see Governance. Ask an Admin for access." />;
   }
-  const { records, authors, tags, registry } = await getStorage().withReadSnapshot(async snapshot => ({
+  const { records, authors, tags, registry, propertyOptions } = await getStorage().withReadSnapshot(async snapshot => ({
     records: await snapshot.listGovernance(),
     authors: await snapshot.listGovernanceAuthors(),
     tags: await snapshot.listTags(),
     registry: await snapshot.getStoredRegistry(),
+    propertyOptions: await snapshot.listMetadataProperties(),
   }));
   const { sources, repoCount } = registry ?? { sources: [], repoCount: 0 };
   const editedSinceResults = new Set(
@@ -37,6 +38,10 @@ export default async function GovernancePage() {
   const packageNames = registry
     ? [...new Set(sources.map((s) => s.packageName))].sort((a, b) => a.localeCompare(b))
     : null;
+  // Display names the registry's sources hold, for the tag editor's Component names preview.
+  const componentNames = registry
+    ? [...new Set(sources.flatMap((s) => (s.exportName ? [s.exportName] : [])))].sort((a, b) => a.localeCompare(b))
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-10">
@@ -52,7 +57,7 @@ export default async function GovernancePage() {
       />
 
       <section id="tags" aria-labelledby="tags-title" className="scroll-mt-24">
-        <TagsPanel allTags={tags} packageNames={packageNames} />
+        <TagsPanel allTags={tags} packageNames={packageNames} componentNames={componentNames} propertyOptions={propertyOptions} />
       </section>
     </div>
   );

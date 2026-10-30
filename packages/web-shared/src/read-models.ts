@@ -12,7 +12,7 @@ import { usedComponentKey, isUsed } from "./usage.js";
 // A stored-format change increments READ_MODEL_FORMAT_VERSION and PROJECTION_VERSION together.
 // PROJECTION_VERSION alone, bumped for an additive change (a new optional field a reader can
 // treat as absent), reprojects every scan without making its current rows unreadable meantime.
-export const PROJECTION_VERSION: number = 10;
+export const PROJECTION_VERSION: number = 11;
 export const READ_MODEL_FORMAT_VERSION: number = 6;
 
 export type ImmutableDetailHead = Omit<ComponentDetailHead, "claimedBy" | "deprecated" | "migrationStatus" | "governedByRecordId">;
@@ -108,6 +108,7 @@ export function deriveOccurrenceRow(occurrence: ResolvedOccurrence, names: Reado
     credit: occurrence.credit, trace: occurrence.trace, ...(writtenName !== undefined ? { writtenName } : {}),
     ...(ownerId !== undefined && ownerName !== undefined ? { owner: { componentId: ownerId, displayName: ownerName } } : {}),
     ...(occurrence.usedIn !== undefined ? { usedIn: occurrence.usedIn } : {}),
+    ...(occurrence.codeOwners?.length ? { codeOwners: occurrence.codeOwners } : {}),
     props, events: occurrence.events ?? [],
   };
 }

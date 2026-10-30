@@ -333,7 +333,8 @@ function matches(selector: CohortSelector, c: ComponentDigest, tags: Tag[], gove
     case "component":
       return c.id === selector.componentId;
     case "tag": {
-      const tagged = resolveTags(presentIdentity(c).packageName, tags).some((t) => t.id === selector.tagId);
+      const target = { packageName: presentIdentity(c).packageName, componentName: displayNameOf(c), metadata: c.metadata };
+      const tagged = resolveTags(target, tags).some((t) => t.id === selector.tagId);
       if (!tagged) return false;
       return selector.deprecatedOnly ? componentDeprecated(c, governance) : true;
     }

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, json, jsonb, index, unique, primaryKey, integer, boolean, bigint, check, customType, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { DashboardConfig, Disposition, RepoViewRow, ComponentFactRow, PackageContributionRow, DetailRow, OccurrenceModelRow, GraphRow } from "@scoutui/web-shared";
+import type { DashboardConfig, Disposition, RepoViewRow, ComponentFactRow, PackageContributionRow, DetailRow, OccurrenceModelRow, GraphRow, TagRule } from "@scoutui/web-shared";
 
 export const repos = pgTable("repos", {
   repoId: text("repo_id").primaryKey(),
@@ -211,7 +211,7 @@ export const tags = pgTable("tags", {
   value: text("value").notNull(),
   category: text("category"), // "library", or null for a plain label
   color: text("color").notNull(),
-  rule: jsonb("rule").$type<{ glob: string[]; exact: string[] }>().notNull(),
+  rule: jsonb("rule").$type<TagRule>().notNull(),
   createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
   updatedByUserId: text("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

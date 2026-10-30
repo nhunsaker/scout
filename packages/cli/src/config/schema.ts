@@ -21,6 +21,7 @@ export interface ConfigFile {
   aliases?: Record<string, string[]>;
   install?: string;
   hookScript?: string;
+  codeOwners?: boolean | string;
 }
 
 const ajv = new Ajv({ allErrors: true, strict: false });

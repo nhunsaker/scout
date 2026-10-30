@@ -1,5 +1,6 @@
 import type { Credit, ScanScope, TraceStep } from "@scoutui/scan-format";
 import { z } from "zod";
+import { TagRuleSchema } from "./tag-rules.js";
 
 // ---- Identity enums (referenced across summary + detail shapes) ----
 export const ComponentScope = z.enum(["external", "local"]);
@@ -19,12 +20,12 @@ export const FrameworkCountSchema = z.object({
 });
 export type FrameworkCount = z.infer<typeof FrameworkCountSchema>;
 
-// ---- Tags (web-authored package grouping) ----
-export const TagRuleSchema = z.object({
-  glob: z.array(z.string()).default([]),   // ["@example/*"]
-  exact: z.array(z.string()).default([]),  // ["legacy-design-system"]
-});
-export type TagRule = z.infer<typeof TagRuleSchema>;
+// ---- Tags (web-authored component grouping, by package, component name or property) ----
+// Shape + matching live in tag-rules.ts: re-exported here so `Tag.rule` below can reference
+// `TagRuleSchema`, and so every existing `import { TagRuleSchema, type TagRule } from "./dto.js"`
+// keeps working unchanged.
+export { TagRuleSchema };
+export type { TagRule } from "./tag-rules.js";
 
 export const TAG_COLOURS = ["teal", "violet", "blue", "berry", "orchid"] as const;
 export const TagColourSchema = z.enum(TAG_COLOURS);
@@ -489,6 +490,8 @@ export const OccurrenceRowSchema = z.object({
   owner: z.object({ componentId: z.string(), displayName: z.string() }).optional(),
   /** The package the call's file sits in; absent when the scan covers one package. */
   usedIn: z.string().optional(),
+  /** The CODEOWNERS owners of the file this call is written in; absent when the scan doesn't record them or the file is unowned. */
+  codeOwners: z.array(z.string()).optional(),
   props: z.array(OccurrencePropChipSchema),
   events: z.array(z.string()).default([]),
 });

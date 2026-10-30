@@ -5,6 +5,7 @@ import type { Tag } from "@scoutui/web-shared";
 import { tagMatchesPackage } from "@scoutui/web-shared/client";
 import { packageCount, TAG_COLUMN_ID, TagEditor, TagSwatch, TagTableColumns } from "./tag-manager";
 import { Button } from "@/components/ui/button";
+import type { PropertyOption } from "@/lib/chart-builder-options";
 import { tagColourName } from "@/lib/chart-palette";
 import { cn } from "@/lib/utils";
 
@@ -16,10 +17,16 @@ const editButtonId = (tagId: string) => `edit-tag-${tagId}`;
 export function TagsPanel({
   allTags,
   packageNames,
+  componentNames = null,
+  propertyOptions = null,
 }: {
   allTags: Tag[];
   /** Null while scan results are rebuilding. */
   packageNames: string[] | null;
+  /** Display names the latest scans hold, for the editor's Component names preview. Null while scan results are rebuilding, or when the caller has none to offer. */
+  componentNames?: string[] | null;
+  /** Metadata keys the latest scans hold, with their distinct values, for the editor's Property picker. Null while scan results are rebuilding, or when the caller has none to offer. */
+  propertyOptions?: PropertyOption[] | null;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -74,7 +81,7 @@ export function TagsPanel({
         </Button>
       </div>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        Group packages by library for adoption charts and filtering.
+        Group packages, components or components with a property, for adoption charts and filtering.
       </p>
 
       {allTags.length === 0 && !creating ? (
@@ -104,6 +111,8 @@ export function TagsPanel({
                 <TagEditor
                   allTags={allTags}
                   packageNames={packageNames}
+                  componentNames={componentNames}
+                  propertyOptions={propertyOptions}
                   onDone={() => closeForm()}
                   onDeleted={() => closeForm()}
                 />
@@ -115,6 +124,8 @@ export function TagsPanel({
                     tag={tag}
                     allTags={allTags}
                     packageNames={packageNames}
+                    componentNames={componentNames}
+                    propertyOptions={propertyOptions}
                     onDone={() => closeForm(tag.id)}
                     onDeleted={() => closeForm()}
                   />
@@ -172,6 +183,35 @@ function TagRow({ tag, packageNames, onEdit }: { tag: Tag; packageNames: string[
   );
 }
 
+/** The component and property parts of a tag's rule, as one line each, for the row under its packages. */
+function TagSelectors({ tag }: { tag: Tag }) {
+  const names = [...(tag.rule.component?.exact ?? []), ...(tag.rule.component?.glob ?? [])];
+  const property = tag.rule.property;
+  const propertyText =
+    property === undefined
+      ? null
+      : property.equals !== undefined && property.equals.length > 0
+        ? `${property.key} is ${property.equals.join(" or ")}`
+        : property.contains !== undefined
+          ? `${property.key} contains “${property.contains}”`
+          : null;
+  if (names.length === 0 && propertyText === null) return null;
+  return (
+    <span className="mt-0.5 flex basis-full flex-col gap-0.5 font-sans text-xs text-muted-foreground">
+      {names.length > 0 ? (
+        <span>
+          Components: <span className="font-mono text-foreground">{names.join(", ")}</span>
+        </span>
+      ) : null}
+      {propertyText !== null ? (
+        <span>
+          Property: <span className="font-mono text-foreground">{propertyText}</span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function TagPackages({ tag }: { tag: Tag }) {
   const [open, setOpen] = useState(false);
   const entries = [...tag.rule.exact, ...tag.rule.glob];
@@ -195,6 +235,7 @@ function TagPackages({ tag }: { tag: Tag }) {
           {open ? "Show fewer" : `+${hidden.toLocaleString()} more`}
         </button>
       ) : null}
+      <TagSelectors tag={tag} />
     </span>
   );
 }

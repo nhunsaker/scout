@@ -38,6 +38,7 @@ const sidebars: SidebarsConfig = {
             "guides/fill-in-a-repos-history",
             "guides/link-web-components-to-your-package",
             "guides/add-custom-properties",
+            "guides/attribute-code-owners",
             "guides/troubleshoot-a-scan",
           ],
         },

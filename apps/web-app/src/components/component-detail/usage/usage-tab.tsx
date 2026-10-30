@@ -8,6 +8,7 @@ import {
   nextUsageSort,
   plural,
   togglePick,
+  toggleOwnerPick,
   type UsageSection,
   type UsageValue,
   type UsageView,
@@ -22,7 +23,7 @@ import { FileTable } from "./file-table";
 import { NoCalls } from "./no-calls";
 import { areaFilterKey, propFilterKey, UsageColumn, valueFilterKey } from "./usage-column";
 import { pinLine, showColumn, typing, useCharWidth, useElementWidth, useMedia, usePinTop, useSteadyStrip, useStickyColumn } from "./usage-layout-hooks";
-import { FilterPills, LINK, UsageToolbar } from "./usage-toolbar";
+import { FilterPills, LINK, OwnerSummary, UsageToolbar } from "./usage-toolbar";
 
 /** md: from here the file list has its header and value columns. */
 const MEDIUM = "(min-width: 48rem)";
@@ -61,7 +62,7 @@ export function UsageTab({ detail, source }: { detail: ComponentDetail; source: 
 function Usage({ detail, source }: { detail: ComponentDetail; source: SourceRef | null }) {
   const index = useMemo(() => usageIndex(detail), [detail]);
   const due = usageDue(detail.deprecated, detail.migrationStatus);
-  const { filters, setFind, setArea, setPicks, setSort, clearFilters } = useUsageFilters();
+  const { filters, setFind, setArea, setPicks, setOwners, setSort, clearFilters } = useUsageFilters();
   const rootRef = useRef<HTMLDivElement>(null);
   const filesRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -177,6 +178,7 @@ function Usage({ detail, source }: { detail: ComponentDetail; source: SourceRef 
     if (key !== null) pressed(areaFilterKey(key), areaFilterKey(""), area !== null);
     setArea(area);
   };
+  const pickOwner = (owner: string) => setOwners(toggleOwnerPick(filters.owners, owner));
 
   const [copied, setCopied] = useState<Copied | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -243,10 +245,12 @@ function Usage({ detail, source }: { detail: ComponentDetail; source: SourceRef 
             barRef={barRef}
             searchRef={searchRef}
             onFilter={() => showColumn(columnRef.current, () => setColumnOpen(true))}
+            onOwner={pickOwner}
             onClearFilters={clearAll}
             onCopy={() => copyList(view.sections, null)}
             copied={copied?.folder === null}
           />
+          {view.hasCodeOwners ? <OwnerSummary owners={view.owners} /> : null}
           {/* The filter pills sit at the top of the list and scroll away with it. */}
           <div ref={stripRef}>
             {view.active > 0 ? (

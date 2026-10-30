@@ -65,7 +65,8 @@ export function FileTable({
     observer.observe(head);
     return () => observer.disconnect();
   }, []);
-  const cols = 3 + columns.length;
+  const hasOwnerColumn = view.hasCodeOwners;
+  const cols = 3 + columns.length + (hasOwnerColumn ? 1 : 0);
   const { key: sortKey, dir } = view.sort;
   const th = cn(TH, !few && "sticky z-10");
   const headTop = few ? undefined : HEAD_TOP;
@@ -78,6 +79,7 @@ export function FileTable({
         {columns.map((c) => (
           <col key={c.prop} style={{ width: c.width }} />
         ))}
+        {hasOwnerColumn ? <col className="w-28 md:w-36" /> : null}
         <col className="w-12 md:w-24" />
       </colgroup>
       <thead ref={headRef} className="hidden md:table-header-group">
@@ -107,6 +109,11 @@ export function FileTable({
               </th>
             );
           })}
+          {hasOwnerColumn ? (
+            <TableHead scope="col" className={th} style={headTop}>
+              Owner
+            </TableHead>
+          ) : null}
           <TableHead scope="col" aria-sort={ariaSort("uses", sortKey, dir)} className={cn(th, "pl-3 pr-4 text-right", SORT_TH)} style={headTop}>
             <SortButton label="Uses" sortKey="uses" current={sortKey} dir={dir} onClick={onSort} align="right" />
           </TableHead>
@@ -124,6 +131,7 @@ export function FileTable({
               onToggle={() => toggle(file.path)}
               columns={columns}
               cols={cols}
+              hasOwnerColumn={hasOwnerColumn}
               source={source}
               hrefWith={hrefWith}
             />
@@ -185,6 +193,7 @@ function FileRow({
   onToggle,
   columns,
   cols,
+  hasOwnerColumn,
   source,
   hrefWith,
 }: {
@@ -194,6 +203,7 @@ function FileRow({
   onToggle: () => void;
   columns: readonly UsageValueColumn[];
   cols: number;
+  hasOwnerColumn: boolean;
   source: SourceRef | null;
   hrefWith: HrefWith;
 }) {
@@ -255,6 +265,11 @@ function FileRow({
             <ValueCell prop={c.prop} cell={file.cells[c.prop]} />
           </td>
         ))}
+        {hasOwnerColumn ? (
+          <td className={cn(td, "hidden px-3 md:table-cell")}>
+            <OwnerCell codeOwners={file.codeOwners} />
+          </td>
+        ) : null}
         <td className={cn(td, "pl-2 pr-3 text-right text-xs leading-6 tabular-nums md:pl-3 md:pr-4")}>
           <span className="sr-only">Uses: </span>
           {file.calls.toLocaleString()}
@@ -279,6 +294,7 @@ function FileRow({
               last={i === file.lines.length - 1}
               owners={owners ? [] : line.owners}
               columns={columns}
+              hasOwnerColumn={hasOwnerColumn}
               source={source}
               hrefWith={hrefWith}
             />
@@ -330,6 +346,29 @@ function ValueCell({ prop, cell }: { prop: string; cell: UsageCell | undefined }
   );
 }
 
+/**
+ * A file's CODEOWNERS owners, compact: the first owner, then "+N" for the rest, all listed in the title; a dash when
+ * the file is unowned or the scan doesn't record owners for it.
+ */
+function OwnerCell({ codeOwners }: { codeOwners: readonly string[] }) {
+  const [first, ...rest] = codeOwners;
+  if (!first) {
+    return (
+      <span className="block text-xs text-faint leading-6">
+        <span className="sr-only">Owner: none</span>
+        <span aria-hidden>–</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex min-w-0 items-baseline gap-1 text-xs leading-6" title={codeOwners.join(", ")}>
+      <span className="sr-only">Owner: </span>
+      <span className="min-w-0 truncate font-mono">{first}</span>
+      {rest.length ? <span className="shrink-0 tabular-nums text-muted-foreground">+{rest.length}</span> : null}
+    </span>
+  );
+}
+
 /** A faint dash for a prop that isn't set, read as "{prop}: not set". */
 function NotSet({ prop, className }: { prop: string; className: string }) {
   return (
@@ -364,6 +403,7 @@ function CallRow({
   last,
   owners,
   columns,
+  hasOwnerColumn,
   source,
   hrefWith,
 }: {
@@ -372,6 +412,7 @@ function CallRow({
   last: boolean;
   owners: readonly UsageOwner[];
   columns: readonly UsageValueColumn[];
+  hasOwnerColumn: boolean;
   source: SourceRef | null;
   hrefWith: HrefWith;
 }) {
@@ -434,6 +475,7 @@ function CallRow({
           </td>
         );
       })}
+      {hasOwnerColumn ? <td className={cn(td, "hidden md:table-cell")} /> : null}
       <td className={td} />
     </tr>
   );

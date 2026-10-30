@@ -74,7 +74,8 @@ Each `HookComponent` is a snapshot: everything but `setMetadata` is frozen, and 
 | `packageName` | `string` \| absent | Present only on a component imported from a package. |
 | `version` | `string \| null` | Same as [`version`](/docs/reference/artifact#components) in the scan file. |
 | `declaredProps` | `string[]` \| absent | Names of the props the component's own code declares, in source order. Present only when the declaration site is readable; see [`declared`](/docs/reference/artifact#declared). |
-| `uses` | `{ filePath, line, column }[]` | Every place this scan found the component rendered. |
+| `codeOwners` | `string[]` \| absent | Repo-defined components only: owners of `filePath`, from the repository's `CODEOWNERS` file, in CODEOWNERS order. Absent when the file has no owner, or [`codeOwners`](/docs/reference/config#attribution-fields) is off or found no file. Scout sets `"Code owners"` from this before `afterScan` runs; see [Attribute code owners](/docs/guides/attribute-code-owners). |
+| `uses` | `{ filePath, line, column, codeOwners? }[]` | Every place this scan found the component rendered. `codeOwners` is that use's own file's owners, same rules as above. |
 | `setMetadata(key, value)` | function | Sets a custom property. See below. |
 
 ## Setting values
@@ -102,40 +103,22 @@ Warning: 3 custom properties dropped: its value isn't a string, number, boolean 
 
 Setting the same key twice keeps the last value. A `Date` is stored as an ISO 8601 timestamp, same as everywhere else in the scan file; see [`metadata`](/docs/reference/artifact#metadata).
 
+A component can already carry a `"Code owners"` property when `afterScan` runs (see [Attribute code owners](/docs/guides/attribute-code-owners)). Setting any other key leaves it alone; `setMetadata("Code owners", ...)` is the only thing that overrides it.
+
 ## Examples
 
 ### Owner, from `CODEOWNERS`
 
-A minimal parser for a `CODEOWNERS` file with simple path entries (no globs):
+Scout already reads your `CODEOWNERS` file and sets a `"Code owners"` property from it, with full `.gitignore`-style pattern matching — see [Attribute code owners](/docs/guides/attribute-code-owners). You don't need a hook for this; it works with no `hookScript` configured at all.
+
+A hook only needs to touch this when you want something the built-in doesn't give you, such as folding owners into your own `owner` property, or mapping a team handle to a friendlier name. `component.codeOwners` is the same owners list, read-only, that the built-in attribution used to set `"Code owners"`:
 
 ```js title="scout.hook.mjs"
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-function readOwners(repoRoot) {
-  const text = readFileSync(join(repoRoot, "CODEOWNERS"), "utf8");
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const [path, ...owners] = line.split(/\s+/);
-      return { path, owners };
-    });
-}
-
-function ownerFor(filePath, entries) {
-  // CODEOWNERS: the last matching entry wins.
-  const match = [...entries].reverse().find((e) => filePath.startsWith(e.path.replace(/^\//, "")));
-  return match?.owners.join(", ");
-}
-
 /** @type {import("@scoutui/cli").ScoutHook} */
 export default {
   afterScan(components, context) {
-    const entries = readOwners(context.repoRoot);
     for (const component of components) {
-      if (component.filePath) component.setMetadata("owner", ownerFor(component.filePath, entries) ?? "unowned");
+      if (component.codeOwners) component.setMetadata("owner", component.codeOwners.join(", "));
     }
   },
 };

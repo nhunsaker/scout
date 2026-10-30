@@ -57,6 +57,12 @@ Only [`backfill`](/docs/reference/cli#backfill) reads this field. `scan` ignores
 | --- | --- | --- | --- |
 | `hookScript` | non-empty string | none | A script `scan` (and `backfill`, through the same config) runs after scanning, before uploading, to set custom properties on each component. Relative to the config folder. `--hook-script` replaces it for `scan`. See [Add custom properties with a hook script](/docs/guides/add-custom-properties). |
 
+### Attribution fields {#attribution-fields}
+
+| Field | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `codeOwners` | `true`, `false`, or a non-empty string | `true` | Attributes each use, and each component defined in the repo, to its file's `CODEOWNERS` owners. `true` reads the first of `.github/CODEOWNERS`, `CODEOWNERS` or `docs/CODEOWNERS` that exists at the repository root; found none, the scan carries on silently, without attribution. `false` turns it off. A string is a path to the file, relative to the config folder; if nothing exists there, the scan warns and carries on without attribution. See [Attribute code owners](/docs/guides/attribute-code-owners). |
+
 ### Import resolution fields
 
 Rarely needed. Set these only when imports go through path aliases the scan can't find on its own. See [Resolve imports in a monorepo](/docs/guides/resolve-imports-in-a-monorepo).
@@ -98,6 +104,7 @@ What each path in the config is relative to:
 | `include`, `exclude` | The config folder. |
 | `tsconfigPath` | The config folder. |
 | `hookScript` | The config folder. |
+| `codeOwners`, when it's a string | The config folder. |
 | `aliases` values | The monorepo root when `scan` prints `Monorepo root: <dir>`, otherwise the config folder. |
 
 `scan` prints `Monorepo root:` when the config folder is one of a monorepo's workspace packages. [Resolve imports in a monorepo](/docs/guides/resolve-imports-in-a-monorepo#if-your-aliases-are-only-in-a-bundler-config) shows the same alias written both ways.

@@ -49,16 +49,18 @@ export function diffDigests(current: DigestScan, previous: DigestScan, governanc
     marks[id] = { kind: "removed" };
     removed++;
     const { packageName, scope, kind } = presentIdentity(b.component);
+    const displayName = displayNameOf(b.component);
     removedRows.push({
       componentId: id,
-      displayName: displayNameOf(b.component),
+      displayName,
       packageName,
       scope,
       kind,
       occurrenceCount: b.occ,
       deprecated: b.deprecated,
-      // Resolved against the current tag rules, by the removed component's own package.
-      tags: resolveTags(packageName, tags),
+      // Resolved against the current tag rules, by the removed component's own package, name
+      // and metadata (as the scan that last held it recorded them).
+      tags: resolveTags({ packageName, componentName: displayName, metadata: b.component.metadata }, tags),
     });
   }
   removedRows.sort((x, y) => y.occurrenceCount - x.occurrenceCount || x.displayName.localeCompare(y.displayName));

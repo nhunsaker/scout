@@ -84,6 +84,7 @@ export async function loadConfig(configPath: string): Promise<ResolvedConfig> {
   if (parsed.aliases !== undefined) resolved.aliases = parsed.aliases;
   if (parsed.install !== undefined) resolved.install = parsed.install;
   if (parsed.hookScript !== undefined) resolved.hookScript = parsed.hookScript;
+  if (parsed.codeOwners !== undefined) resolved.codeOwners = parsed.codeOwners;
   return resolved;
 }
 
@@ -108,5 +109,6 @@ function problemText(e: ErrorObject): string {
   if (e.keyword === "type" && typeof type === "string") return `should be ${TYPE_WORDS[type] ?? type}`;
   if (e.keyword === "minItems") return "can't be an empty list";
   if (e.keyword === "minLength") return "can't be empty";
+  if (e.keyword === "oneOf") return "should be true, false, or a path";
   return e.message ?? "isn't valid";
 }

@@ -1,11 +1,11 @@
 ---
-description: "Group packages into libraries with tags, so you can filter by library and compare libraries in charts."
+description: "Group components into libraries with tags — by package, component name or a scanned property — so you can filter and compare libraries in charts."
 sidebar_label: "Tags"
 ---
 
 # Tags
 
-A [tag](/docs/reference/glossary#tag) groups packages under one name, usually a library, so the dashboard can compare them. Tags let you filter the packages list and a repo's components by library, and chart libraries against each other.
+A [tag](/docs/reference/glossary#tag) groups components under one name, usually a library, so the dashboard can compare them. Tags let you filter the packages list and a repo's components by library, and chart libraries against each other.
 
 For example, to see how far your repos have moved from the old library to the new one, create two tags:
 
@@ -13,6 +13,10 @@ For example, to see how far your repos have moved from the old library to the ne
 | --- | --- |
 | `acme-ui` | `@acme/ui` |
 | `acme-ui-legacy` | `@acme/ui-legacy` |
+
+Most tags are package tags like these two. A tag can also select components by their **display name** or by a **scanned custom property**, for components a package pattern can't reach — see [Match components by name](#match-components-by-name) and [Match components by a scanned property](#match-components-by-a-scanned-property) below.
+
+A component matches a tag when it matches **any** part the tag's rule sets — its package pattern, or its component-name pattern, or its property rule — not only when it matches every part. A tag that sets just one part (as every tag did before component-name and property matching existed) works exactly as it always has.
 
 Tags apply to every scan already uploaded, including older ones, so you don't need to scan again.
 
@@ -52,6 +56,32 @@ Check what else a pattern catches: before you save, the form shows how many scan
 A pattern also matches the packages your repos define. A component defined in a repo counts under its own package: its workspace package, or the repo's [root package](/docs/reference/artifact#root-package). So `@acme/*` also matches an app named `@acme/web`, and the app's own components count under `acme-ui`. If the form names one of your apps, or counts more packages than the library has, list the library's packages by their exact names instead.
 
 A package that matches two tags counts under both. See [Why shares can overlap](/docs/explanation/dashboard/reading-the-numbers#why-shares-can-overlap).
+
+## Match components by name
+
+Some libraries aren't one package: a team renames components over time, or a repo defines them locally rather than importing them, so no package pattern reaches them all. Use **Component names** in the tag form for this: it takes one component name or glob pattern per line, matched against a component's display name (the name the dashboard shows it under), the same way **Packages** matches package names.
+
+For example, a `legacy` tag for every component whose name still starts with `Old`, wherever it's defined:
+
+```text title="legacy, Component names"
+Old*
+```
+
+This also reaches a locally defined component (one a repo declares itself, with no package at all) that a package pattern could never match.
+
+## Match components by a scanned property
+
+A [hook script](/docs/guides/add-custom-properties) can set custom properties on a component, such as its owning team. Use **Property** in the tag form to tag by one of these instead of a name or package: pick the property's key, then either **Equals** one of its known values or **Contains** some text.
+
+For example, a `design-system` tag for every component a hook script marked with `Owner` equal to `@acme/ds`:
+
+| Property key | Equals |
+| --- | --- |
+| `Owner` | `@acme/ds` |
+
+## Where each part applies
+
+A component-name or property match needs an actual component to check it against. Pages and charts that already work at the component level — a repo's **Components** tab, a component's tag chips, a tag's chart series — check every part of a tag's rule. A page that works at the package level instead — the **packages** list, a package's own page — has no single component to check a name or property against, so only the package part applies there; the **Packages** column still tells you which package pattern a tag carries.
 
 ## Add a package from its page
 

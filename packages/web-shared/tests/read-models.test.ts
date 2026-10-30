@@ -139,4 +139,47 @@ describe("custom properties (metadata): shared by the component fact and the det
     expect(rows.find(r => r.componentId === panel.id)?.metadata).toEqual({ Owner: { type: "string", value: "@acme/ds" } });
     expect(rows.find(r => r.componentId === button.id)?.metadata).toBeUndefined();
   });
+
+  it("gives the component list API's rows a tag matched by display name or scanned property, not only by package (PR-10)", () => {
+    const panel = component(repoDeclaration("repo-a", "src/Panel.tsx", "Panel"), { metadata: { Owner: { type: "string", value: "@acme/ds" } } });
+    const oldWidget = component(packageExport("unrelated-pkg", "OldWidget"));
+    const button = component(packageExport("@example/ui", "Button"));
+    const scan = artifact({ components: [panel, oldWidget, button], occurrences: [] });
+    const fact = { ...deriveFactScan(scan), meta: received(scan).meta };
+    const dsTag = { id: "ds", value: "ds", category: "library" as const, color: "teal" as const, rule: { glob: [], exact: [], property: { key: "Owner", equals: ["@acme/ds"] } } };
+    const oldTag = { id: "old", value: "old", category: "library" as const, color: "berry" as const, rule: { glob: [], exact: [], component: { glob: ["Old*"], exact: [] } } };
+    const rows = reduceComponentRows(fact, "", [], [dsTag, oldTag]);
+    expect(rows.find(r => r.componentId === panel.id)?.tags?.map(t => t.id)).toEqual(["ds"]);
+    expect(rows.find(r => r.componentId === oldWidget.id)?.tags?.map(t => t.id)).toEqual(["old"]);
+    expect(rows.find(r => r.componentId === button.id)?.tags).toEqual([]);
+  });
+});
+
+describe("CODEOWNERS: threaded from the occurrence onto its occurrence row", () => {
+  it("carries an occurrence's codeOwners onto its occurrence row", () => {
+    const button = component(packageExport("@example/ui", "Button"));
+    const call = resolvedAt(button, "src/checkout/Pay.tsx", 6, { codeOwners: ["@acme/checkout", "@acme/payments"] });
+    const scan = artifact({ components: [button], occurrences: [call] });
+    const rows = [...deriveReadModelRows(scan, createProjectionContext(scan))];
+    const occurrence = rows.flatMap(row => (row.kind === "occurrence" ? [row.occurrence] : []))[0];
+    expect(occurrence?.codeOwners).toEqual(["@acme/checkout", "@acme/payments"]);
+  });
+
+  it("leaves codeOwners off the row for an occurrence that carries none, old scans included", () => {
+    const button = component(packageExport("@example/ui", "Button"));
+    const call = resolvedAt(button, "src/checkout/Pay.tsx", 6); // no codeOwners field at all, as an older scan writes it
+    const scan = artifact({ components: [button], occurrences: [call] });
+    const rows = [...deriveReadModelRows(scan, createProjectionContext(scan))];
+    const occurrence = rows.flatMap(row => (row.kind === "occurrence" ? [row.occurrence] : []))[0];
+    expect(occurrence?.codeOwners).toBeUndefined();
+  });
+
+  it("leaves codeOwners off the row for a file CODEOWNERS covers with no owner (an empty array)", () => {
+    const button = component(packageExport("@example/ui", "Button"));
+    const call = resolvedAt(button, "src/checkout/Pay.tsx", 6, { codeOwners: [] });
+    const scan = artifact({ components: [button], occurrences: [call] });
+    const rows = [...deriveReadModelRows(scan, createProjectionContext(scan))];
+    const occurrence = rows.flatMap(row => (row.kind === "occurrence" ? [row.occurrence] : []))[0];
+    expect(occurrence?.codeOwners).toBeUndefined();
+  });
 });

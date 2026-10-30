@@ -1,0 +1,447 @@
+{
+  "meta": {
+    "schemaVersion": 2,
+    "scannerName": "@scoutui/cli",
+    "scannerVersion": "0.0.0",
+    "scanId": "baseline",
+    "scannedAt": "1970-01-01T00:00:00.000Z",
+    "repo": {
+      "id": "codeowners",
+      "gitRemote": null,
+      "commit": "baseline",
+      "committedAt": "1970-01-01T00:00:00.000Z",
+      "initialCommit": "baseline",
+      "branch": "baseline"
+    },
+    "scope": {
+      "folder": "",
+      "include": [
+        "src/**/*.{ts,tsx,js,jsx}"
+      ],
+      "exclude": [
+        "**/*.{test,spec,stories}.*",
+        "**/node_modules/**"
+      ],
+      "packages": [
+        {
+          "name": "codeowners",
+          "folder": ""
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "id": "9fb1eab32d8dd34e",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "codeowners",
+        "filePath": "src/App.tsx",
+        "exportName": "App"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 0,
+        "fileCount": 0
+      },
+      "usage": "none",
+      "props": {},
+      "definition": {
+        "line": 6,
+        "column": 8
+      },
+      "owningPackage": "codeowners",
+      "version": null,
+      "composition": {
+        "rendersByCount": {
+          "725daec275a38dbc": 1,
+          "e893c63d4513139c": 1,
+          "72bd9c578cbe17c9": 1,
+          "2be238a45c4d2e55": 1
+        },
+        "renderedByCount": {},
+        "isRootCount": 0,
+        "isLeafCount": 0
+      },
+      "metadata": {
+        "Code owners": {
+          "type": "string",
+          "value": "@example/design-system, @example/platform"
+        }
+      }
+    },
+    {
+      "id": "725daec275a38dbc",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "codeowners",
+        "filePath": "src/checkout/Cart.tsx",
+        "exportName": "Cart"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 1,
+        "fileCount": 1
+      },
+      "usage": "direct",
+      "props": {},
+      "definition": {
+        "line": 3,
+        "column": 8
+      },
+      "owningPackage": "codeowners",
+      "version": null,
+      "composition": {
+        "rendersByCount": {
+          "b2a0916c359ebaf8": 1
+        },
+        "renderedByCount": {
+          "9fb1eab32d8dd34e": 1
+        },
+        "isRootCount": 0,
+        "isLeafCount": 0
+      },
+      "metadata": {
+        "Code owners": {
+          "type": "string",
+          "value": "@example/checkout"
+        }
+      }
+    },
+    {
+      "id": "b2a0916c359ebaf8",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "codeowners",
+        "filePath": "src/design-system/Button.tsx",
+        "exportName": "Button"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 3,
+        "fileCount": 3
+      },
+      "usage": "direct",
+      "props": {},
+      "declared": {
+        "props": {
+          "children": {}
+        },
+        "hasRest": false
+      },
+      "definition": {
+        "line": 1,
+        "column": 8
+      },
+      "owningPackage": "codeowners",
+      "version": null,
+      "composition": {
+        "rendersByCount": {},
+        "renderedByCount": {
+          "725daec275a38dbc": 1,
+          "72bd9c578cbe17c9": 1,
+          "e893c63d4513139c": 1
+        },
+        "isRootCount": 0,
+        "isLeafCount": 3
+      },
+      "metadata": {
+        "Code owners": {
+          "type": "string",
+          "value": "@example/design-system, @example/platform"
+        }
+      }
+    },
+    {
+      "id": "72bd9c578cbe17c9",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "codeowners",
+        "filePath": "src/legacy/OldThing.tsx",
+        "exportName": "OldThing"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 1,
+        "fileCount": 1
+      },
+      "usage": "direct",
+      "props": {},
+      "definition": {
+        "line": 3,
+        "column": 8
+      },
+      "owningPackage": "codeowners",
+      "version": null,
+      "composition": {
+        "rendersByCount": {
+          "b2a0916c359ebaf8": 1
+        },
+        "renderedByCount": {
+          "9fb1eab32d8dd34e": 1
+        },
+        "isRootCount": 0,
+        "isLeafCount": 0
+      }
+    },
+    {
+      "id": "e893c63d4513139c",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "codeowners",
+        "filePath": "src/search/SearchBox.tsx",
+        "exportName": "SearchBox"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 1,
+        "fileCount": 1
+      },
+      "usage": "direct",
+      "props": {},
+      "definition": {
+        "line": 3,
+        "column": 8
+      },
+      "owningPackage": "codeowners",
+      "version": null,
+      "composition": {
+        "rendersByCount": {
+          "b2a0916c359ebaf8": 1
+        },
+        "renderedByCount": {
+          "9fb1eab32d8dd34e": 1
+        },
+        "isRootCount": 0,
+        "isLeafCount": 0
+      },
+      "metadata": {
+        "Code owners": {
+          "type": "string",
+          "value": "@example/search"
+        }
+      }
+    },
+    {
+      "id": "2be238a45c4d2e55",
+      "identity": {
+        "kind": "package-export",
+        "packageName": "@example/web-button",
+        "publicEntry": "dist/react",
+        "exportName": "WebButton"
+      },
+      "framework": "react",
+      "stats": {
+        "occurrenceCount": 1,
+        "fileCount": 1
+      },
+      "usage": "direct",
+      "props": {
+        "variant": {
+          "values": [
+            {
+              "provenance": "written",
+              "value": "primary",
+              "count": 1
+            }
+          ],
+          "dynamic": 0,
+          "omitted": 0
+        }
+      },
+      "version": "1.13.4",
+      "composition": {
+        "rendersByCount": {},
+        "renderedByCount": {
+          "9fb1eab32d8dd34e": 1
+        },
+        "isRootCount": 0,
+        "isLeafCount": 1
+      }
+    }
+  ],
+  "occurrences": [
+    {
+      "occurrenceId": "d15ee2850f644f09",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "725daec275a38dbc"
+      },
+      "filePath": "src/App.tsx",
+      "line": 9,
+      "column": 7,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "./checkout/Cart",
+          "name": "Cart"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "9fb1eab32d8dd34e",
+      "codeOwners": [
+        "@example/design-system",
+        "@example/platform"
+      ]
+    },
+    {
+      "occurrenceId": "655710d347a18055",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "e893c63d4513139c"
+      },
+      "filePath": "src/App.tsx",
+      "line": 10,
+      "column": 7,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "./search/SearchBox",
+          "name": "SearchBox"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "9fb1eab32d8dd34e",
+      "codeOwners": [
+        "@example/design-system",
+        "@example/platform"
+      ]
+    },
+    {
+      "occurrenceId": "91379a5843ae58b0",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "72bd9c578cbe17c9"
+      },
+      "filePath": "src/App.tsx",
+      "line": 11,
+      "column": 7,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "./legacy/OldThing",
+          "name": "OldThing"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "9fb1eab32d8dd34e",
+      "codeOwners": [
+        "@example/design-system",
+        "@example/platform"
+      ]
+    },
+    {
+      "occurrenceId": "065943f500212b0b",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "2be238a45c4d2e55"
+      },
+      "filePath": "src/App.tsx",
+      "line": 12,
+      "column": 7,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "@example/web-button/dist/react.js",
+          "name": "WebButton"
+        }
+      ],
+      "props": {
+        "variant": {
+          "tier": "written",
+          "value": "primary"
+        }
+      },
+      "ownerComponentId": "9fb1eab32d8dd34e",
+      "codeOwners": [
+        "@example/design-system",
+        "@example/platform"
+      ]
+    },
+    {
+      "occurrenceId": "f109d5a6458dd5ff",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "b2a0916c359ebaf8"
+      },
+      "filePath": "src/checkout/Cart.tsx",
+      "line": 4,
+      "column": 10,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "../design-system/Button",
+          "name": "Button"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "725daec275a38dbc",
+      "codeOwners": [
+        "@example/checkout"
+      ]
+    },
+    {
+      "occurrenceId": "d9fca9ffbabd2f18",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "b2a0916c359ebaf8"
+      },
+      "filePath": "src/legacy/OldThing.tsx",
+      "line": 4,
+      "column": 10,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "../design-system/Button",
+          "name": "Button"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "72bd9c578cbe17c9"
+    },
+    {
+      "occurrenceId": "855490489a1a52b6",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "b2a0916c359ebaf8"
+      },
+      "filePath": "src/search/SearchBox.tsx",
+      "line": 4,
+      "column": 10,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [
+        {
+          "kind": "import",
+          "specifier": "../design-system/Button",
+          "name": "Button"
+        }
+      ],
+      "props": {},
+      "ownerComponentId": "e893c63d4513139c",
+      "codeOwners": [
+        "@example/search"
+      ]
+    }
+  ],
+  "diagnostics": []
+}

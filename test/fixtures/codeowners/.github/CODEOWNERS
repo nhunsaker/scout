@@ -1,0 +1,16 @@
+# Design system owns every component by default, and co-owns with platform.
+*.tsx @example/design-system @example/platform
+
+[Team sections are GitLab syntax; Scout skips them like a comment.]
+
+# Checkout owns its own folder outright, overriding the default above.
+src/checkout/ @example/checkout
+
+# Search owns its own folder outright too.
+src/search/ @example/search
+
+^[Optional sections are skipped the same way.]
+
+# Legacy code has no owner: this clears the *.tsx default for everything
+# nested under it, since it's the last rule to match those paths.
+src/legacy/

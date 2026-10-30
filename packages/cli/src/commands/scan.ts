@@ -64,6 +64,7 @@ import { loadGlobalComponents, detectAutoImportFramework } from "../scan/global-
 import { type DiagnosticCollector, createDiagnosticCollector } from "../diagnostic.js";
 import { buildScanStats, type ScanStats } from "../artifact/scan-stats.js";
 import { runHook } from "../hook/run-hook.js";
+import { loadCodeOwners } from "../scan/codeowners.js";
 import { validateArtifact, type AttributionTarget, type DeclaredPropApi, type ScanArtifact } from "@scoutui/scan-format";
 import type { ResolvedConfig } from "../types.js";
 
@@ -762,6 +763,25 @@ export async function scanRepository(input: {
       : {}),
   });
 
+  const codeOwners = await loadCodeOwners({
+    repoRoot: outputRoot,
+    configDir: cfg.configDir,
+    setting: cfg.codeOwners,
+    warn: (msg) => scanWarning(msg),
+  });
+  if (codeOwners !== null) {
+    for (const occurrence of artifact.occurrences) {
+      const owners = codeOwners.ownersFor(occurrence.filePath);
+      if (owners.length > 0) occurrence.codeOwners = [...owners];
+    }
+    for (const component of artifact.components) {
+      if (component.identity.kind !== "repository-declaration") continue;
+      const owners = codeOwners.ownersFor(component.identity.filePath);
+      if (owners.length === 0) continue;
+      component.metadata = { ...component.metadata, "Code owners": { type: "string", value: owners.join(", ") } };
+    }
+  }
+
   const hookScriptPath = hookScriptOverride ?? (cfg.hookScript !== undefined ? resolve(cfg.configDir, cfg.hookScript) : undefined);
   if (hookScriptPath !== undefined) {
     const displayRelative = posixPath(relative(process.cwd(), hookScriptPath));
@@ -770,6 +790,7 @@ export async function scanRepository(input: {
       displayPath: displayRelative.startsWith("..") ? hookScriptPath : displayRelative,
       context: { repoId: meta.repo.id, commit: meta.repo.commit, configDir: cfg.configDir, repoRoot: outputRoot },
       log,
+      ...(codeOwners !== null ? { codeOwnersLookup: (filePath: string) => codeOwners.ownersFor(filePath) } : {}),
     });
   }
 
