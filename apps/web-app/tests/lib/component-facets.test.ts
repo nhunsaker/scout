@@ -6,7 +6,13 @@ import {
   facetsToParams,
   filterRows,
   paramsToFacets,
+  parsePropertyColumns,
+  propertyColumnsToParams,
+  propertyValueLabel,
+  propertyValueText,
   rowsUsedIn,
+  togglePropertyValue,
+  topMetadataKeys,
   usedInOptions,
   writtenNameMatch,
   type FacetState,
@@ -197,6 +203,9 @@ describe("URL params", () => {
     ["changed since the previous scan", { changed: true }, "changed=true"],
     ["has unused props", { hasUnusedProps: true }, "unused-props=true"],
     ["has no unused props", { hasUnusedProps: false }, "unused-props=false"],
+    ["one value of one property", { properties: { Owner: ["@acme/ds"] } }, "prop=Owner:@acme/ds"],
+    ["two values of one property (OR within)", { properties: { Owner: ["@acme/ds", "@acme/other"] } }, "prop=Owner:@acme/ds&prop=Owner:@acme/other"],
+    ["one value each of two properties (AND across)", { properties: { Owner: ["@acme/ds"], "Has stories": ["true"] } }, "prop=Owner:@acme/ds&prop=Has+stories:true"],
   ])("writes and reads %s", (_case, facets, written) => {
     const f = { ...emptyFacets(), ...facets };
     expect(queryString(facetsToParams(f))).toBe(written);
@@ -215,11 +224,93 @@ describe("URL params", () => {
     ["deprecated other than true or false", "deprecated=yes"],
     ["changed other than true", "changed=yes"],
     ["unused-props other than true or false", "unused-props=yes"],
+    ["a prop with no colon separating its key and value", "prop=OwnerOnly"],
+    ["a prop with an empty value", "prop=Owner:"],
   ])("ignores %s", (_case, written) => {
     expect(paramsToFacets(new URLSearchParams(written))).toEqual(emptyFacets());
   });
 
   it("reads a repeated value once", () => {
     expect(paramsToFacets(new URLSearchParams("tag=icons&tag=icons")).tags).toEqual(["icons"]);
+  });
+
+  it("dedupes a repeated property value within the same key", () => {
+    expect(paramsToFacets(new URLSearchParams("prop=Owner:ds&prop=Owner:ds")).properties).toEqual({ Owner: ["ds"] });
+  });
+});
+
+describe("Properties", () => {
+  const row: ComponentRow = {
+    componentId: "", kind: "react-component", scope: "local", packageName: null,
+    displayName: "", disambiguator: null, version: null,
+    occurrenceCount: 1, fileCount: 1, deprecated: false, tags: [],
+  };
+  const dsOwned = { ...row, componentId: "d", displayName: "Panel", metadata: { Owner: { type: "string" as const, value: "@acme/ds" }, "Has stories": { type: "boolean" as const, value: true } } };
+  const otherOwned = { ...row, componentId: "o", displayName: "Field", metadata: { Owner: { type: "string" as const, value: "@acme/other" } } };
+  const unowned = { ...row, componentId: "u", displayName: "Tag" };
+
+  it("keeps only rows whose value for the key is one of the selected values (OR within a key)", () => {
+    expect(filterRows([dsOwned, otherOwned, unowned], { ...emptyFacets(), properties: { Owner: ["@acme/ds", "@acme/other"] } }).map(r => r.componentId)).toEqual(["d", "o"]);
+    expect(filterRows([dsOwned, otherOwned, unowned], { ...emptyFacets(), properties: { Owner: ["@acme/ds"] } }).map(r => r.componentId)).toEqual(["d"]);
+  });
+
+  it("ANDs across keys: a row must carry every selected key with one of its values", () => {
+    const f = { ...emptyFacets(), properties: { Owner: ["@acme/ds"], "Has stories": ["true"] } };
+    expect(filterRows([dsOwned, otherOwned, unowned], f).map(r => r.componentId)).toEqual(["d"]);
+  });
+
+  it("without the filter, keeps every row regardless of metadata", () => {
+    expect(filterRows([dsOwned, otherOwned, unowned], emptyFacets()).map(r => r.componentId)).toEqual(["d", "o", "u"]);
+  });
+
+  it("facetOptions: each key's value counts follow the other filters and ignore that key's own selection", () => {
+    const options = facetOptions([dsOwned, otherOwned, unowned], null, { ...emptyFacets(), properties: { Owner: ["@acme/ds"] } });
+    const owner = options.properties.find(p => p.key === "Owner");
+    expect(owner?.values).toEqual([
+      { value: "@acme/ds", label: "@acme/ds", count: 1 },
+      { value: "@acme/other", label: "@acme/other", count: 1 },
+    ]);
+  });
+
+  it("facetOptions: only offers keys the rows carry, a boolean rendered by its text form", () => {
+    const options = facetOptions([dsOwned, otherOwned, unowned], null, emptyFacets());
+    expect(options.properties.map(p => p.key)).toEqual(["Has stories", "Owner"]);
+    expect(options.properties.find(p => p.key === "Has stories")?.values).toEqual([{ value: "true", label: "true", count: 1 }]);
+  });
+
+  it("togglePropertyValue adds, removes, and drops the key once its last value is removed", () => {
+    const added = togglePropertyValue({}, "Owner", "@acme/ds");
+    expect(added).toEqual({ Owner: ["@acme/ds"] });
+    const extended = togglePropertyValue(added, "Owner", "@acme/other");
+    expect(extended).toEqual({ Owner: ["@acme/ds", "@acme/other"] });
+    const removedOne = togglePropertyValue(extended, "Owner", "@acme/ds");
+    expect(removedOne).toEqual({ Owner: ["@acme/other"] });
+    const removedLast = togglePropertyValue(removedOne, "Owner", "@acme/other");
+    expect(removedLast).toEqual({});
+  });
+
+  it("propertyValueText/propertyValueLabel read a row's value by key, undefined when absent", () => {
+    expect(propertyValueText(dsOwned, "Owner")).toBe("@acme/ds");
+    expect(propertyValueText(dsOwned, "Missing")).toBeUndefined();
+    expect(propertyValueLabel(dsOwned, "Has stories")).toBe("true");
+  });
+
+  it("topMetadataKeys: the N most common keys by presence count, ties broken alphabetically", () => {
+    // Owner appears on both rows (count 2); Has stories only on one (count 1): Owner ranks first.
+    expect(topMetadataKeys([dsOwned, otherOwned, unowned], 1)).toEqual(["Owner"]);
+    expect(topMetadataKeys([dsOwned, otherOwned, unowned])).toEqual(["Owner", "Has stories"]);
+    expect(topMetadataKeys([unowned])).toEqual([]);
+  });
+
+  it("topMetadataKeys: breaks a count tie alphabetically", () => {
+    const a = { ...row, componentId: "a", metadata: { Zeta: { type: "string" as const, value: "1" } } };
+    const b = { ...row, componentId: "b", metadata: { Alpha: { type: "string" as const, value: "1" } } };
+    expect(topMetadataKeys([a, b])).toEqual(["Alpha", "Zeta"]);
+  });
+
+  it("the col param round-trips a repeated value, deduped", () => {
+    expect(propertyColumnsToParams(["Owner", "Has stories"])).toEqual([["col", "Owner"], ["col", "Has stories"]]);
+    expect(parsePropertyColumns(new URLSearchParams("col=Owner&col=Owner&col=DS+version"))).toEqual(["Owner", "DS version"]);
+    expect(parsePropertyColumns(new URLSearchParams(""))).toEqual([]);
   });
 });

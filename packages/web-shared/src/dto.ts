@@ -195,6 +195,8 @@ export const CohortSelectorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("package"), packageName: z.string(), deprecatedOnly: z.boolean().optional(), role: z.literal("successor").optional() }),
   z.object({ kind: z.literal("component"), componentId: z.string(), label: z.string().optional(), role: z.literal("successor").optional() }),
   z.object({ kind: z.literal("local") }),
+  // One manual series: components whose metadata[key] equals value (matched as text; see `metadataValueText`).
+  z.object({ kind: z.literal("property"), key: z.string(), value: z.string() }),
 ]);
 export type CohortSelector = z.infer<typeof CohortSelectorSchema>;
 
@@ -284,6 +286,22 @@ export const CohortSeriesSchema = z.object({
 });
 export type CohortSeries = z.infer<typeof CohortSeriesSchema>;
 
+// ---- Metadata (user-set component properties, from a CLI hook script) ----
+// Mirrors the scan file's `MetadataValue` (`@scoutui/scan-format`): a component's
+// metadata is a user-set key → value map, each value one of these four known
+// types. A scan file can carry a value of some future type this dashboard
+// doesn't know yet; `knownMetadata` drops it rather than guessing at it, so an
+// entry here is always one of the four.
+export const MetadataValueSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("string"), value: z.string() }),
+  z.object({ type: z.literal("number"), value: z.number() }),
+  z.object({ type: z.literal("boolean"), value: z.boolean() }),
+  z.object({ type: z.literal("date"), value: z.string() }), // ISO
+]);
+export type MetadataValue = z.infer<typeof MetadataValueSchema>;
+export const ComponentMetadataSchema = z.record(z.string(), MetadataValueSchema);
+export type ComponentMetadata = z.infer<typeof ComponentMetadataSchema>;
+
 // ---- Component row (repo detail table) ----
 export const PackageCountsSchema = z.object({ occurrenceCount: z.number().int().nonnegative(), fileCount: z.number().int().nonnegative() });
 export type PackageCounts = z.infer<typeof PackageCountsSchema>;
@@ -313,6 +331,7 @@ export const ComponentRowSchema = z.object({
   deprecated: z.boolean(),
   tags: z.array(TagRefSchema).optional(),
   apiUsage: ComponentApiUsageSchema.optional(), // absent when the component has no declared API
+  metadata: ComponentMetadataSchema.optional(), // user-set key → value properties (a CLI hook script); absent when the scan sets none
 });
 export type ComponentRow = z.infer<typeof ComponentRowSchema>;
 
@@ -540,6 +559,8 @@ export const ComponentDetailSchema = z.object({
     .nullable(),
   props: z.array(PropUsageSchema),
   events: z.array(EventUsageSchema).default([]),
+  /** User-set key → value properties (a CLI hook script); absent when the scan sets none. */
+  metadata: ComponentMetadataSchema.optional(),
   composition: z.object({
     renders: z.array(CompositionEdgeSchema),
     renderedBy: z.array(CompositionEdgeSchema),

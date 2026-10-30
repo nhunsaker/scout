@@ -35,6 +35,7 @@ describe("commandHelp", () => {
     expect(out).toContain("  --quiet            Hide progress, the summary and most warnings\n");
     expect(out).toContain("  --repo-id <name>   Repository name on the dashboard (default: repoId in the config, else from the git remote, else the folder name)\n");
     expect(out).toContain("  --repo-root <dir>  Folder that paths in the scan file are relative to (default: the top of the git repository)\n");
+    expect(out).toContain("  --hook-script <path>  Script to set custom properties on each component (default: hookScript in the config)\n");
     expect(out).toContain("  --host <url>       Dashboard address (default: SCOUTUI_HOST, else host in scout.config.json, else the first dashboard you signed in to)\n");
     expect(out).toContain("  --debug            Show the details behind an error\n");
   });

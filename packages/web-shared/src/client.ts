@@ -9,6 +9,7 @@ export * from "./dashboard-render.js";
 export * from "./chart-range.js";
 export * from "./query.js";
 export * from "./tags.js";
+export * from "./metadata.js";
 export * from "./governance.js";
 export * from "./governance-integrity.js";
 export * from "./usage.js";

@@ -9,12 +9,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DeprecatedMark } from "@/components/deprecated-mark";
 import { SortButton, ariaSort, sortRows, useSort, type SortDir } from "@/components/ui/sortable";
-import { NO_PACKAGE_TITLE, writtenNameMatch } from "@/lib/component-facets";
+import { NO_PACKAGE_TITLE, propertyValueLabel, propertyValueText, writtenNameMatch } from "@/lib/component-facets";
 import { hrefWithQuery } from "@/lib/query-string";
 import { deltaOf, deltaTone, signedCount } from "@/lib/scan-diff-view";
 import { compareVersions } from "@/lib/version-order";
 
-const COLUMN_COUNT = 6;
+// Component, Package, Version, Files, Unused, Uses — before any property columns.
+const BASE_COLUMN_COUNT = 6;
+
+/** A property column's sort key, distinct from the fixed `SortKey` values. */
+type ColumnKey = `col:${string}`;
+const columnKey = (key: string): ColumnKey => `col:${key}`;
 
 /** The outline badge for `added` and `removed` rows. Its border clears the 3:1
  *  non-text minimum on the panel (3.3:1 light, 3.8:1 dark); the default
@@ -25,7 +30,7 @@ const MARK_BADGE = "shrink-0 border-muted-foreground/70 text-muted-foreground";
  *  390px table 44px past its scroller), one truncating line from sm up. */
 const NAME_ROW = "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:flex-nowrap";
 
-type SortKey = "displayName" | "packageName" | "version" | "fileCount" | "unusedProps" | "occurrenceCount" | "delta";
+type SortKey = "displayName" | "packageName" | "version" | "fileCount" | "unusedProps" | "occurrenceCount" | "delta" | ColumnKey;
 // `delta` is not here: the changed view's Occurrences header opens ascending
 // (biggest drop first) every time, including on coming back to it from
 // another column.
@@ -39,6 +44,7 @@ export function ComponentsTable({
   notInLatest,
   search,
   usedIn,
+  columns = [],
 }: {
   repoId: string;
   rows: ComponentRow[];
@@ -53,7 +59,10 @@ export function ComponentsTable({
   search?: string;
   /** The Used in package: a row used in more than one package links to its Usage tab with this package picked. */
   usedIn?: string | null;
+  /** Metadata keys shown as extra, sortable columns, after Version and before Files. */
+  columns?: string[];
 }) {
+  const COLUMN_COUNT = BASE_COLUMN_COUNT + columns.length;
   // Default: most-used first. The changed view's Occurrences header sorts by
   // the signed Δ instead, biggest drop first.
   const occurrencesKey: SortKey = marks ? "delta" : "occurrenceCount";
@@ -68,7 +77,10 @@ export function ComponentsTable({
       sortKey === "version"
         ? sortByVersion(rows, sortDir)
         : sortRows(rows, sortKey, sortDir, (r, k) =>
-            k === "delta" ? deltaOf(marks?.[r.componentId], r.occurrenceCount) : k === "unusedProps" ? r.apiUsage?.neverUsedCount : r[k],
+            k === "delta" ? deltaOf(marks?.[r.componentId], r.occurrenceCount)
+              : k === "unusedProps" ? r.apiUsage?.neverUsedCount
+              : k.startsWith("col:") ? propertyValueText(r, k.slice(4))
+              : r[k as Exclude<SortKey, ColumnKey | "delta" | "unusedProps">],
           ),
     [rows, sortKey, sortDir, marks],
   );
@@ -126,6 +138,14 @@ export function ComponentsTable({
           <TableHead className="w-[10%]" aria-sort={ariaSort("version", sortKey, sortDir)}>
             <SortButton label="Version" sortKey="version" current={sortKey} dir={sortDir} onClick={toggleSort} />
           </TableHead>
+          {/* Optional property columns (up to 3; see `topMetadataKeys`), visible from sm up
+              like every other column here. Each is a plain text sort on the property's text
+              value, blank rows sorting last either way. */}
+          {columns.map((key) => (
+            <TableHead key={key} className="w-[10%]" aria-sort={ariaSort(columnKey(key), sortKey, sortDir)}>
+              <SortButton label={key} title={key} sortKey={columnKey(key)} current={sortKey} dir={sortDir} onClick={toggleSort} />
+            </TableHead>
+          ))}
           <TableHead className="w-[8%] text-right" aria-sort={ariaSort("fileCount", sortKey, sortDir)}>
             <SortButton label="Files" sortKey="fileCount" current={sortKey} dir={sortDir} onClick={toggleSort} align="right" />
           </TableHead>
@@ -163,7 +183,7 @@ export function ComponentsTable({
           if (!row) return null;
           const mark = marks?.[row.componentId];
           if (mark?.kind === "removed") {
-            return <GhostRow key={row.componentId} r={row} index={vr.index} measure={virtualizer.measureElement} slotCh={slotCh} />;
+            return <GhostRow key={row.componentId} r={row} index={vr.index} measure={virtualizer.measureElement} slotCh={slotCh} columns={columns} />;
           }
           const linked = !notInLatest?.has(row.componentId);
           return (
@@ -180,6 +200,7 @@ export function ComponentsTable({
                 delta={marks ? deltaOf(mark, row.occurrenceCount) : undefined}
                 slotCh={slotCh}
                 writtenAs={search ? writtenNameMatch(row, search) : undefined}
+                columns={columns}
               />
             </TableRow>
           );
@@ -214,8 +235,8 @@ function hrefFor(repoId: string, componentId: string, area: string | null): stri
   return hrefWithQuery(`/repos/${encodeURIComponent(repoId)}/components/${encodeURIComponent(componentId)}`, area ? [["area", area]] : []);
 }
 
-/** The cells of one component: name and detail link, package, version, files and occurrences. */
-function RowCells({ r, href, mark, delta, slotCh, writtenAs }: { r: ComponentRow; href: string | undefined; mark?: DiffMark | undefined; delta?: number | undefined; slotCh: number; writtenAs?: string | undefined }) {
+/** The cells of one component: name and detail link, package, version, properties, files and occurrences. */
+function RowCells({ r, href, mark, delta, slotCh, writtenAs, columns }: { r: ComponentRow; href: string | undefined; mark?: DiffMark | undefined; delta?: number | undefined; slotCh: number; writtenAs?: string | undefined; columns: string[] }) {
   const deprecated = r.deprecated;
 
   return (
@@ -300,6 +321,14 @@ function RowCells({ r, href, mark, delta, slotCh, writtenAs }: { r: ComponentRow
       >
         {r.version ?? "—"}
       </TableCell>
+      {columns.map((key) => {
+        const label = propertyValueLabel(r, key);
+        return (
+          <TableCell key={key} className="hidden overflow-hidden truncate text-xs text-muted-foreground sm:table-cell" title={label}>
+            {label ?? "—"}
+          </TableCell>
+        );
+      })}
       <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">
         {r.fileCount.toLocaleString()}
       </TableCell>
@@ -329,7 +358,7 @@ function RowCells({ r, href, mark, delta, slotCh, writtenAs }: { r: ComponentRow
  * version and files a dash, and occurrences `0 (−5)`: a faint zero beside the
  * negated previous count.
  */
-function GhostRow({ r, index, measure, slotCh }: { r: ComponentRow; index: number; measure: (el: HTMLTableRowElement | null) => void; slotCh: number }) {
+function GhostRow({ r, index, measure, slotCh, columns }: { r: ComponentRow; index: number; measure: (el: HTMLTableRowElement | null) => void; slotCh: number; columns: string[] }) {
   return (
     <TableRow data-index={index} ref={measure}>
       <TableCell className="overflow-hidden align-middle">
@@ -359,6 +388,9 @@ function GhostRow({ r, index, measure, slotCh }: { r: ComponentRow; index: numbe
         {r.packageName ?? "—"}
       </TableCell>
       <TableCell className="hidden text-faint sm:table-cell">—</TableCell>
+      {columns.map((key) => (
+        <TableCell key={key} className="hidden text-faint sm:table-cell">—</TableCell>
+      ))}
       <TableCell className="hidden text-right text-faint sm:table-cell">—</TableCell>
       <TableCell className="hidden text-right text-faint sm:table-cell">—</TableCell>
       <TableCell className="hidden pr-3 text-right tabular-nums text-muted-foreground sm:table-cell">

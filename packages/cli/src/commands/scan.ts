@@ -75,6 +75,7 @@ import { isInstalledPackage } from "../walker/installed-package.js";
 import { loadGlobalComponents, detectAutoImportFramework } from "../scan/global-components.js";
 import { type DiagnosticCollector, createDiagnosticCollector } from "../diagnostic.js";
 import { buildScanStats, type ScanStats } from "../artifact/scan-stats.js";
+import { runHook } from "../hook/run-hook.js";
 import { validateArtifact, type AttributionTarget, type DeclaredPropApi, type ScanArtifact } from "@scoutui/scan-format";
 import type { ResolvedConfig } from "../types.js";
 
@@ -103,6 +104,8 @@ export type ScanOptions = {
   /** Upload even if the dashboard already has this commit, replacing its scan. Needs `upload`. */
   rescan?: boolean;
   hostOverride?: string;
+  /** Overrides the config's hookScript. An absolute path (the CLI resolves it against the current directory). */
+  hookScriptOverride?: string;
   /** Given the scan formats the dashboard reads, when its pre-scan check lists them. */
   onScanFormats?: (formats: number[]) => void;
 };
@@ -247,7 +250,17 @@ export async function runScan(opts: ScanOptions): Promise<ScanResult> {
     return { output: null, upload: "failed" };
   }
 
-  const { artifact, stats } = await scanRepository({ cfg, outputRoot, workspaceRoot, workspaceGraph, files, meta, log, startedAt: t0 });
+  const { artifact, stats } = await scanRepository({
+    cfg,
+    outputRoot,
+    workspaceRoot,
+    workspaceGraph,
+    files,
+    meta,
+    log,
+    startedAt: t0,
+    ...(opts.hookScriptOverride !== undefined ? { hookScriptOverride: opts.hookScriptOverride } : {}),
+  });
 
   // A dry run writes the scan file; an upload doesn't.
   if (uploader === undefined) await writeJson(artifact, outputPath);
@@ -380,8 +393,10 @@ export async function scanRepository(input: {
   log: Logger;
   /** performance.now() when the scan started. */
   startedAt: number;
+  /** Overrides `cfg.hookScript`. An absolute path. */
+  hookScriptOverride?: string;
 }): Promise<{ artifact: ScanArtifact; stats: ScanStats }> {
-  const { cfg, outputRoot, workspaceRoot, workspaceGraph, files, meta, log, startedAt } = input;
+  const { cfg, outputRoot, workspaceRoot, workspaceGraph, files, meta, log, startedAt, hookScriptOverride } = input;
   const { quiet } = log;
 
   // Re-base a scanRoot-relative POSIX path into outputRoot-relative POSIX.
@@ -810,6 +825,17 @@ export async function scanRepository(input: {
       ? { usedIn: (filePath: string) => findPackageOrRoot(workspaceGraph, resolve(outputRoot, filePath))?.name }
       : {}),
   });
+
+  const hookScriptPath = hookScriptOverride ?? (cfg.hookScript !== undefined ? resolve(cfg.configDir, cfg.hookScript) : undefined);
+  if (hookScriptPath !== undefined) {
+    const displayRelative = posixPath(relative(process.cwd(), hookScriptPath));
+    await runHook(artifact.components, artifact.occurrences, {
+      scriptPath: hookScriptPath,
+      displayPath: displayRelative.startsWith("..") ? hookScriptPath : displayRelative,
+      context: { repoId: meta.repo.id, commit: meta.repo.commit, configDir: cfg.configDir, repoRoot: outputRoot },
+      log,
+    });
+  }
 
   if (!quiet) {
     for (const d of artifact.diagnostics) if (d.code === "dependency-not-installed") log.warn(formatWarning(d));

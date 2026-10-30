@@ -14,6 +14,7 @@ export * from "./cohorts.js";
 export * from "./dashboard-render.js";
 export * from "./chart-range.js";
 export * from "./digest.js";
+export * from "./metadata.js";
 export * from "./present-identity.js";
 export * from "./usage.js";
 export * from "./usage-view.js";

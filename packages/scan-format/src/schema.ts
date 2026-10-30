@@ -20,8 +20,29 @@ function fail(ctx: z.RefinementCtx, path: (string | number)[]): void {
   ctx.addIssue({ code: z.ZodIssueCode.custom, path });
 }
 
-/** A value in an open list whose `kind` this version doesn't know. Its other fields are kept, unchecked. */
-type OtherKind = { kind: string };
+/** A value in an open list whose discriminant this version doesn't know. Its other fields are kept, unchecked. */
+type OtherKind<Key extends string> = { [K in Key]: string };
+
+/**
+ * An open list keyed by `key`: a known discriminant is checked against its variant, and any other non-empty one
+ * passes with its other fields kept, unchecked.
+ */
+function openKindsOn<
+  Key extends string,
+  Variants extends [z.ZodDiscriminatedUnionOption<Key>, ...z.ZodDiscriminatedUnionOption<Key>[]],
+>(key: Key, ...variants: Variants): z.ZodType<z.infer<Variants[number]> | OtherKind<Key>> {
+  const known = z.discriminatedUnion(key, variants);
+  const other = z
+    .object({ [key]: nonEmptyString } as { [K in Key]: typeof nonEmptyString })
+    .passthrough()
+    .superRefine((value: Record<string, unknown>, ctx) => {
+      // A known discriminant gets here only when its variant failed: its variant's issues, at their fields, reject it.
+      const discriminant = value[key] as string;
+      if (!known.optionsMap.has(discriminant)) return;
+      for (const issue of known.safeParse(value).error?.issues ?? []) ctx.addIssue(issue);
+    });
+  return z.union([known, other]);
+}
 
 /**
  * An open list keyed by `kind`: a known kind is checked against its variant, and any other non-empty kind passes
@@ -29,17 +50,8 @@ type OtherKind = { kind: string };
  */
 function openKinds<
   Variants extends [z.ZodDiscriminatedUnionOption<"kind">, ...z.ZodDiscriminatedUnionOption<"kind">[]],
->(...variants: Variants): z.ZodType<z.infer<Variants[number]> | OtherKind> {
-  const known = z.discriminatedUnion("kind", variants);
-  const other = z
-    .object({ kind: nonEmptyString })
-    .passthrough()
-    .superRefine((value, ctx) => {
-      // A known kind gets here only when its variant failed: its variant's issues, at their fields, reject it.
-      if (!known.optionsMap.has(value.kind)) return;
-      for (const issue of known.safeParse(value).error?.issues ?? []) ctx.addIssue(issue);
-    });
-  return z.union([known, other]);
+>(...variants: Variants): z.ZodType<z.infer<Variants[number]> | OtherKind<"kind">> {
+  return openKindsOn("kind", ...variants);
 }
 
 /** An open list of plain values: any non-empty string passes, including one this version doesn't know. */
@@ -256,6 +268,31 @@ export type CompositionRollup = {
   isLeafCount: number;
 };
 
+/**
+ * Key for a custom property a scan hook set on a component (CLI `--hook-script`): starts with a letter, then
+ * letters, digits, spaces, ".", "_" or "-", up to 64 characters.
+ */
+export const metadataKeyPattern = /^[A-Za-z][\w .-]{0,63}$/;
+const metadataKeySchema = z.string().regex(metadataKeyPattern);
+
+/** A component carries at most this many custom-property keys. */
+export const METADATA_MAX_KEYS = 32;
+
+/**
+ * A custom property's value, as a scan hook's `setMetadata` coerces it. Tagged by `type` through `openKindsOn`
+ * rather than `kind`, so it reads the same way as the rest of this file's open lists: a future value type an older
+ * dashboard doesn't know is kept, unchecked, never rejected.
+ */
+const metadataValueSchema = openKindsOn(
+  "type",
+  z.object({ type: z.literal("string"), value: z.string().max(256) }),
+  z.object({ type: z.literal("number"), value: finiteNumber }),
+  z.object({ type: z.literal("boolean"), value: z.boolean() }),
+  /** `value` is `Date#toISOString()`'s output: a string `Date.parse` accepts. */
+  z.object({ type: z.literal("date"), value: timestamp }),
+);
+export type MetadataValue = z.infer<typeof metadataValueSchema>;
+
 const componentSchema = z
   .object({
     id: z.string(),
@@ -278,12 +315,15 @@ const componentSchema = z
     /** Repository declarations only: the package its file belongs to, the deepest workspace package holding it or else the root package. */
     owningPackage: z.string().optional(),
     version: z.string().nullable(),
+    /** Custom properties a `--hook-script` set on this component (CODING_STANDARDS: an older dashboard can ignore this field and still answer correctly). At most `METADATA_MAX_KEYS` keys. */
+    metadata: z.record(metadataKeySchema, metadataValueSchema).optional(),
   })
   .superRefine((component, ctx) => {
     const onTag = component.identity.kind === "tag";
     if (component.id !== componentKey(component.identity)) fail(ctx, ["id"]);
     if (component.attribution !== undefined && !onTag) fail(ctx, ["attribution"]);
     if (onTag ? component.framework !== undefined : component.framework === undefined) fail(ctx, ["framework"]);
+    if (component.metadata !== undefined && Object.keys(component.metadata).length > METADATA_MAX_KEYS) fail(ctx, ["metadata"]);
   });
 export type Component = z.infer<typeof componentSchema>;
 

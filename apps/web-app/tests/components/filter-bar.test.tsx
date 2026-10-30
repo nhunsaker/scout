@@ -14,6 +14,7 @@ const options: FacetOptions = {
   ],
   packages: [{ value: "@x/lib", count: 3 }],
   tags: [{ value: "icons", color: "#0f766e", count: 3 }],
+  properties: [],
   deprecatedCount: 2,
   changedCount: null,
   deprecatedMax: 2,
@@ -350,6 +351,41 @@ describe("FilterBar Used in facet", () => {
     const onChange = renderBar(options, { ...emptyFacets(), usedIn: "@example/web" }, 2, true, { usedIn, packageFolders });
     expect(screen.getByText("used in")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove used in @example/web" }));
+    expect(onChange).toHaveBeenCalledWith(emptyFacets());
+  });
+});
+
+describe("FilterBar Properties facet", () => {
+  const properties = [
+    { key: "Owner", values: [{ value: "@acme/ds", label: "@acme/ds", count: 2 }, { value: "@acme/other", label: "@acme/other", count: 1 }] },
+    { key: "DS version", values: [{ value: "3", label: "3", count: 2 }] },
+  ];
+
+  it("lists keys first, then drills into one key's values", async () => {
+    renderBar({ ...options, properties });
+    await openFacet(/^properties/i);
+    expect(screen.getByRole("button", { name: /^Owner/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^DS version/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Owner/ }));
+    expect(screen.getByRole("button", { name: /^@acme\/ds/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^@acme\/other/ })).toBeInTheDocument();
+    // Back to the key list.
+    fireEvent.click(screen.getByRole("button", { name: "Back to properties" }));
+    expect(screen.getByRole("button", { name: /^Owner/ })).toBeInTheDocument();
+  });
+
+  it("picking a value adds it to that key's selection (OR within a key)", async () => {
+    const onChange = renderBar({ ...options, properties }, { ...emptyFacets(), properties: { Owner: ["@acme/ds"] } });
+    await openFacet(/^properties/i);
+    fireEvent.click(screen.getByRole("button", { name: /^Owner/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^@acme\/other/ }));
+    expect(onChange).toHaveBeenCalledWith({ ...emptyFacets(), properties: { Owner: ["@acme/ds", "@acme/other"] } });
+  });
+
+  it("shows a pill per selected value, named by its key, and removing the last one drops the key", () => {
+    const onChange = renderBar({ ...options, properties }, { ...emptyFacets(), properties: { Owner: ["@acme/ds"] } });
+    expect(screen.getByRole("button", { name: "Remove Owner @acme/ds" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Owner @acme/ds" }));
     expect(onChange).toHaveBeenCalledWith(emptyFacets());
   });
 });

@@ -112,4 +112,46 @@ describe("validateArtifact", () => {
     const a = fixture(); setAt(a, path, value);
     expect(validateArtifact(a)).toEqual(invalidAt(path));
   });
+
+  describe("metadata", () => {
+    it("accepts a value of each known type", () => {
+      const a = fixture();
+      a.components[0].metadata = {
+        owner: { type: "string", value: "design-systems" },
+        propCount: { type: "number", value: 3 },
+        hasStories: { type: "boolean", value: true },
+        reviewed: { type: "date", value: "2026-01-15T00:00:00.000Z" },
+      };
+      const result = validateArtifact(a);
+      expect(result.ok).toBe(true);
+    });
+
+    it("preserves a value type it doesn't know, unchecked", () => {
+      const a = fixture();
+      a.components[0].metadata = { note: { type: "emoji", glyph: "👍" } };
+      const result = validateArtifact(a);
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.artifact.components[0]?.metadata).toEqual({ note: { type: "emoji", glyph: "👍" } });
+    });
+
+    it("rejects a key that doesn't match the allowed pattern", () => {
+      const a = fixture();
+      a.components[0].metadata = { "1bad": { type: "string", value: "x" } };
+      expect(validateArtifact(a)).toEqual(invalidAt("components[0].metadata.1bad"));
+    });
+
+    it("rejects a string value over 256 characters", () => {
+      const a = fixture();
+      a.components[0].metadata = { owner: { type: "string", value: "x".repeat(257) } };
+      expect(validateArtifact(a)).toEqual(invalidAt("components[0].metadata.owner.value"));
+    });
+
+    it("rejects more than 32 keys", () => {
+      const a = fixture();
+      a.components[0].metadata = Object.fromEntries(
+        Array.from({ length: 33 }, (_, i) => [`k${i}`, { type: "number", value: i }]),
+      );
+      expect(validateArtifact(a)).toEqual(invalidAt("components[0].metadata"));
+    });
+  });
 });

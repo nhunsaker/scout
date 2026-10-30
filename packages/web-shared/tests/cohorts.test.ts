@@ -261,6 +261,44 @@ describe("distinct-used componentCount", () => {
   });
 });
 
+describe("property cohorts", () => {
+  const dsOwned = component(packageExport("@x/web-webc", "Owned"), { metadata: { Owner: { type: "string", value: "@acme/ds" } } });
+  const otherOwned = component(packageExport("@x/web-webc", "OtherOwned"), { metadata: { Owner: { type: "string", value: "@acme/other" } } });
+  const unowned = component(packageExport("@x/web-webc", "Unowned"));
+  const p = scan("r1", t1, [[dsOwned, 4], [otherOwned, 2], [unowned, 1]]);
+
+  it("resolveCohort: matches components whose metadata[key] equals value as text", () => {
+    expect(resolveCohort({ kind: "property", key: "Owner", value: "@acme/ds" }, p, [])).toEqual({ occurrences: 4, usedKeys: new Set([dsOwned.id]) });
+  });
+
+  it("resolveCohort: a value that matches nothing (wrong value, missing key, or unknown-typed) counts 0", () => {
+    expect(resolveCohort({ kind: "property", key: "Owner", value: "@acme/none" }, p, [])).toEqual({ occurrences: 0, usedKeys: new Set() });
+    expect(resolveCohort({ kind: "property", key: "Missing", value: "@acme/ds" }, p, [])).toEqual({ occurrences: 0, usedKeys: new Set() });
+  });
+
+  it("is always nameable, even with no matching component in scope (self-describing label)", () => {
+    const pts = projectCohortSnapshot([p], [], [{ kind: "property", key: "Owner", value: "@acme/none" }], "count");
+    expect(pts).toEqual([{ cohortKey: "property:Owner:%40acme%2Fnone", label: "Owner: @acme/none", color: "", value: 0, componentCount: 0 }]);
+  });
+
+  it("projectCohortSnapshot: counts occurrences and the used component for a matching value", () => {
+    const pts = projectCohortSnapshot([p], [], [{ kind: "property", key: "Owner", value: "@acme/ds" }], "count");
+    expect(pts[0]).toMatchObject({ label: "Owner: @acme/ds", value: 4, componentCount: 1 });
+  });
+
+  it("never role-stamped: a property cohort carries no deprecated/successor role", () => {
+    const [pt] = projectCohortSnapshot([p], [], [{ kind: "property", key: "Owner", value: "@acme/ds" }], "count");
+    expect(pt?.role).toBeUndefined();
+  });
+
+  it("matches a boolean/number/date value by its text form", () => {
+    const flagged = component(packageExport("@x/web-webc", "Flagged"), { metadata: { "Has stories": { type: "boolean", value: true }, "DS version": { type: "number", value: 3 } } });
+    const q = scan("r2", t1, [[flagged, 5]]);
+    expect(resolveCohort({ kind: "property", key: "Has stories", value: "true" }, q, [])).toEqual({ occurrences: 5, usedKeys: new Set([flagged.id]) });
+    expect(resolveCohort({ kind: "property", key: "DS version", value: "3" }, q, [])).toEqual({ occurrences: 5, usedKeys: new Set([flagged.id]) });
+  });
+});
+
 describe("role stamping (derived from governance)", () => {
   const supersededCard: GovernanceRecord = {
     id: "g1", grain: "component", targetPackage: "legacy-design-system", targetExport: "Card",

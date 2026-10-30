@@ -34,6 +34,7 @@ ${CONFIG}
   --repo-root <dir>  Folder that paths in the scan file are relative to (default: the top of the git repository)
   --dry-run          Scan without uploading, and write scout-scan.json next to the config
   --rescan           Upload even if the dashboard already has this commit, replacing its scan
+  --hook-script <path>  Script to set custom properties on each component (default: hookScript in the config)
 ${HOST}
   --debug            Show the details behind an error
 `;

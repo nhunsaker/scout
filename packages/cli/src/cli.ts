@@ -96,7 +96,7 @@ async function main(argv: string[], log: Logger, update: string | null): Promise
 
 async function runScanCommand(rest: string[], log: Logger, notice: string | null): Promise<number> {
   const { values } = parseCommand("scan", rest);
-  const { config, quiet, "dry-run": dryRun, "repo-id": repoId, "repo-root": repoRoot, rescan, host } = values;
+  const { config, quiet, "dry-run": dryRun, "repo-id": repoId, "repo-root": repoRoot, rescan, host, "hook-script": hookScript } = values;
   if (dryRun && rescan) throw new CliError("--rescan and --dry-run can't be used together: --dry-run doesn't upload.");
   const scanOpts: ScanOptions = {
     configPath: typeof config === "string" ? config : "./scout.config.json",
@@ -107,6 +107,7 @@ async function runScanCommand(rest: string[], log: Logger, notice: string | null
   if (typeof repoRoot === "string") scanOpts.repoRoot = repoRoot;
   if (rescan) scanOpts.rescan = true;
   if (typeof host === "string") scanOpts.hostOverride = host;
+  if (typeof hookScript === "string") scanOpts.hookScriptOverride = resolve(process.cwd(), hookScript);
   scanOpts.onScanFormats = onScanFormats;
   return scanExitCode(await runScan(scanOpts));
 }

@@ -38,6 +38,8 @@ A component [defined in the repo](/docs/reference/glossary#local) is listed unde
 
 Badges beside the name show its origin (**External** or **Local**), its type (**React**, **Vue**, **Web component** or **Undefined element**), and **Deprecated** when a lifecycle record covers it. **From** names its package, followed by the entry point when it was imported from a subpath (`button` for `@acme/ui/button`), the installed version and, for a component defined in the repo, the file and line after **defined at**.
 
+When a [hook script](/docs/guides/add-custom-properties) set custom properties on this component, a **Properties** section below the header lists each one, key then value.
+
 The page always shows the repo's latest scan, even when the repo page is showing an [older scan](/docs/guides/dashboard/repos#look-at-an-older-scan).
 
 It has two tabs: **Usage** (the default) and **Composition**. The tab you pick, and the search, filters and sort on **Usage**, are kept in the page URL, so a copied link opens the same view.

@@ -62,6 +62,12 @@ If the preview reads **Trends appear once these repos have been scanned more tha
 
 With one repo picked under **Repos**, the list holds only what that repo uses or has used. A search shows at most 50 components; pick a package to see all of its components. To remove a series, press its **×** in the list at the top of the **Series** panel, or pick it in **Add a series** again.
 
+### Chart one custom-property value
+
+If a [hook script](/docs/guides/add-custom-properties) sets custom properties on your components, **Add a property series**, below **Add a series**, charts the components that carry one value: pick a key, such as `Owner`, then one of its values, such as `@acme/ds`. The series counts every component anywhere in scope whose property reads that value, however many packages or repos it spans.
+
+This adds one series per value you pick; it doesn't chart every value of a key at once. Add the series again for another value of the same key, such as `@acme/platform`, to compare them on the same chart.
+
 ### Count only deprecated components
 
 To see how much [deprecated](/docs/reference/glossary#deprecated) code a library still has, open the options of a tag or package series in the list at the top of the **Series** panel and choose **Only deprecated components**. The series then counts only the components a [lifecycle record](/docs/reference/glossary#lifecycle-record) marks as replaced or retired. If no record covers any of them, the series drops to zero.

@@ -162,3 +162,36 @@ describe("declared-prop usage: shared by the component fact and the detail head'
     expect(rows.find(r => r.componentId === button.id)?.apiUsage).toBeUndefined();
   });
 });
+
+describe("custom properties (metadata): shared by the component fact and the detail head", () => {
+  it("promotes known metadata onto ComponentFact and the detail head, dropping an entry of a type this dashboard doesn't know", () => {
+    const panel = component(repoDeclaration("repo-a", "src/Panel.tsx", "Panel"), {
+      metadata: {
+        Owner: { type: "string", value: "@acme/ds" },
+        "DS version": { type: "number", value: 3 },
+        "Has stories": { type: "boolean", value: true },
+        // An entry of a future type this dashboard doesn't know: dropped, not guessed at.
+        Priority: { type: "weight", value: "high" } as never,
+      },
+    });
+    const button = component(packageExport("@example/ui", "Button")); // no metadata at all
+    const scan = artifact({ components: [panel, button], occurrences: [] });
+    const context = createProjectionContext(scan);
+    const facts = deriveFactScan(scan, context).components;
+    const expected = { Owner: { type: "string", value: "@acme/ds" }, "DS version": { type: "number", value: 3 }, "Has stories": { type: "boolean", value: true } };
+    expect(facts.find(c => c.id === panel.id)?.metadata).toEqual(expected);
+    expect(facts.find(c => c.id === button.id)?.metadata).toBeUndefined();
+    expect(deriveComponentDetailHead(context, panel.id)?.metadata).toEqual(expected);
+    expect(deriveComponentDetailHead(context, button.id)?.metadata).toBeUndefined();
+  });
+
+  it("carries a row's metadata through reduceComponentRows unchanged, since one repo's one scan has nothing to reconcile across", () => {
+    const panel = component(repoDeclaration("repo-a", "src/Panel.tsx", "Panel"), { metadata: { Owner: { type: "string", value: "@acme/ds" } } });
+    const button = component(packageExport("@example/ui", "Button"));
+    const scan = artifact({ components: [panel, button], occurrences: [] });
+    const fact = { ...deriveFactScan(scan), meta: received(scan).meta };
+    const rows = reduceComponentRows(fact, "");
+    expect(rows.find(r => r.componentId === panel.id)?.metadata).toEqual({ Owner: { type: "string", value: "@acme/ds" } });
+    expect(rows.find(r => r.componentId === button.id)?.metadata).toBeUndefined();
+  });
+});

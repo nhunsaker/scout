@@ -97,6 +97,7 @@ If the dashboard already has a scan of this commit, `scan` says so and stops wit
 | --- | --- | --- | --- |
 | `--repo-id <value>` | string | the config's `repoId`, else derived from the git remote (see [Repo identity](/docs/reference/config#repo-identity)) | [Repo id](/docs/reference/glossary#repo-id) written into the scan file. Replaces the config's `repoId`. |
 | `--repo-root <dir>` | path | the top of the git repository that holds the config file | Folder that file paths in the scan file are relative to. Relative to the current directory. |
+| `--hook-script <path>` | path | the config's `hookScript`, if set | Script to set custom properties on each component. Relative to the current directory. Replaces the config's `hookScript`. See [Add custom properties with a hook script](/docs/guides/add-custom-properties). A missing script, one that doesn't export `afterScan`, or one that throws, stops the scan with exit code `2` and a message naming the script. |
 
 ## `backfill`
 
@@ -113,6 +114,8 @@ Scans one commit a week of the tracked branch's history, newest first, and uploa
 | `--config <path>` | path | `./scout.config.json` | Config file to read. Relative to the current directory. |
 | `--host <url>` | URL | see [Host resolution](#host-resolution) | Dashboard to upload to. |
 | `--quiet` | none | off | Hides progress. Skipped commits, errors and the closing line still print. |
+
+`backfill` has no `--hook-script` flag, but a [`hookScript`](/docs/reference/config#custom-property-fields) set in the config runs for every commit it scans.
 
 With [`--debug`](#global-flags), `backfill` also prints each install's and each scan's output, and the detail behind each skipped commit.
 

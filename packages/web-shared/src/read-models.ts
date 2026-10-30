@@ -1,8 +1,9 @@
 import { displayNameOf, type Component, type ResolvedOccurrence, type ScanArtifact } from "@scoutui/scan-format";
-import type { ComponentApiUsage, ComponentDetailHead, ComponentSummaryBand, CompositionEdge, DeclaredMeta, EventUsage, OccurrencePropChip, OccurrenceRow, PackageCounts, PropUsage, ReferenceSource, ScanFinding, WrittenValue } from "./dto.js";
+import type { ComponentApiUsage, ComponentDetailHead, ComponentMetadata, ComponentSummaryBand, CompositionEdge, DeclaredMeta, EventUsage, OccurrencePropChip, OccurrenceRow, PackageCounts, PropUsage, ReferenceSource, ScanFinding, WrittenValue } from "./dto.js";
 import { type ComponentDigest, toComponentDigest } from "./digest.js";
 import type { CompositionGraphEdge, CompositionGraphNode } from "./composition-graph.js";
 import { shownWrittenName } from "./display-name.js";
+import { knownMetadata } from "./metadata.js";
 import { disambiguatorOf, governanceIdentity, presentIdentity, type GovernanceIdentity } from "./present-identity.js";
 import { deriveScanFindings } from "./scan-findings.js";
 import { createComponentProjectionContext, displayNameCollisionKey, type ComponentProjectionContext, type OccurrenceStatistics, type ProjectionContext } from "./projection-context.js";
@@ -12,7 +13,7 @@ import { usedComponentKey, isUsed } from "./usage.js";
 // PROJECTION_VERSION alone, bumped for an additive change (a new optional field
 // a reader can treat as absent), reprojects every scan without making its
 // current rows unreadable in the meantime.
-export const PROJECTION_VERSION: number = 10;
+export const PROJECTION_VERSION: number = 11;
 export const READ_MODEL_FORMAT_VERSION: number = 6;
 
 export type ImmutableDetailHead = Omit<ComponentDetailHead, "claimedBy" | "deprecated" | "migrationStatus" | "governedByRecordId">;
@@ -28,6 +29,8 @@ export type ComponentFact = Pick<Component, "id" | "identity" | "framework" | "a
   usedIn?: Record<string, PackageCounts>;
   /** Declared-prop counts, from `deriveApiUsageCounts`; absent when the component has no declared API. */
   apiUsage?: ComponentApiUsage;
+  /** User-set key → value properties, known types only (see `knownMetadata`); absent when the scan sets none. */
+  metadata?: ComponentMetadata;
 };
 /** A stored scan's meta as pages read it: the scan file's, with the commit date and arrival time of its `scans` row in place of the file's `scannedAt`. */
 export type StoredScanMeta = Omit<ScanArtifact["meta"], "scannedAt"> & { committedAt: string; arrivedAt: string };
@@ -82,6 +85,7 @@ function deriveComponentFact(context: ComponentProjectionContext, component: Com
   const displayName = context.names.get(component.id) ?? displayNameOf(component);
   const collides = (context.collisions.get(displayNameCollisionKey(presented.packageName, displayName)) ?? 0) > 1;
   const apiUsage = deriveApiUsageCounts(component);
+  const metadata = knownMetadata(component.metadata);
   return {
     id: component.id,
     identity: component.identity,
@@ -101,6 +105,7 @@ function deriveComponentFact(context: ComponentProjectionContext, component: Com
       ? { usedIn: Object.fromEntries([...stats.byPackage].map(([name, inPackage]) => [name, { occurrenceCount: inPackage.count, fileCount: inPackage.files.size }])) }
       : {}),
     ...(apiUsage ? { apiUsage: { declaredCount: apiUsage.declaredCount, neverUsedCount: apiUsage.neverUsedCount } } : {}),
+    ...(metadata ? { metadata } : {}),
   };
 }
 
@@ -283,6 +288,8 @@ export function deriveComponentDetailHead(context: ProjectionContext, componentI
     ),
   };
 
+  const metadata = knownMetadata(component.metadata);
+
   return {
     componentId,
     repoId: context.artifact.meta.repo.id,
@@ -297,6 +304,7 @@ export function deriveComponentDetailHead(context: ProjectionContext, componentI
     definedAt,
     props,
     events,
+    ...(metadata ? { metadata } : {}),
     composition: {
       renders,
       renderedBy,

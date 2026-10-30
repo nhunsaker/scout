@@ -1,6 +1,7 @@
 import type { CohortPoint, CohortRole, CohortSeries, CohortSelector, GovernanceRecord, Tag } from "./dto.js";
 import type { ComponentDigest, DigestScan } from "./digest.js";
 import { displayNameOf } from "@scoutui/scan-format";
+import { isKnownMetadataValue, metadataValueText } from "./metadata.js";
 import { resolveTags } from "./tags.js";
 import { componentDeprecated } from "./governance.js";
 import { disambiguatorOf, presentIdentity } from "./present-identity.js";
@@ -37,6 +38,8 @@ export function cohortKey(selector: CohortSelector): string {
       return `component:${selector.componentId}`;
     case "tag":
       return `tag:${selector.tagId}`;
+    case "property":
+      return `property:${encodeURIComponent(selector.key)}:${encodeURIComponent(selector.value)}`;
     default: {
       const _exhaustive: never = selector;
       return _exhaustive;
@@ -67,6 +70,9 @@ function cohortIdentity(selector: CohortSelector, artifacts: DigestScan[], tags:
       const t = tags.find((x) => x.id === selector.tagId);
       return t ? { key, label: t.value, color: t.color } : null;
     }
+    case "property":
+      // Self-describing: nameable whether or not any in-scope component currently holds it.
+      return { key, label: `${selector.key}: ${selector.value}`, color: "" };
     default: {
       const _exhaustive: never = selector;
       return _exhaustive;
@@ -120,6 +126,8 @@ function cohortRole(selector: CohortSelector, artifacts: DigestScan[], governanc
       const c = representativeMember(selector.componentId, artifacts);
       return c !== null && componentDeprecated(c, governance) ? "deprecated" : selector.role;
     }
+    case "property":
+      return undefined;
     default: {
       const _exhaustive: never = selector;
       return _exhaustive;
@@ -328,6 +336,10 @@ function matches(selector: CohortSelector, c: ComponentDigest, tags: Tag[], gove
       const tagged = resolveTags(presentIdentity(c).packageName, tags).some((t) => t.id === selector.tagId);
       if (!tagged) return false;
       return selector.deprecatedOnly ? componentDeprecated(c, governance) : true;
+    }
+    case "property": {
+      const value = c.metadata?.[selector.key];
+      return value !== undefined && isKnownMetadataValue(value) && metadataValueText(value) === selector.value;
     }
     default: {
       const _exhaustive: never = selector;
