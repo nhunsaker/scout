@@ -13,6 +13,7 @@ import {
 } from "@scoutui/parser-angular";
 import type { DeclaredPropApi } from "@scoutui/scan-format";
 import type { AngularComponentDecl, AngularModuleDecl } from "./local-index/detect-angular.js";
+import type { AngularLibraryIndex } from "./scan/angular-library-index.js";
 import type { LocalDefinition } from "./local-index/types.js";
 
 /** A value import as the graph records it. */
@@ -103,9 +104,19 @@ export function bootstrappedComponents(calls: readonly AngularBootstrapCall[], f
   return out;
 }
 
-/** Every exported component's selector across the repo. */
-export function buildAngularSelectorIndex(compiler: AngularCompiler, files: readonly PendingAngularFile[]): SelectorIndex {
+/** Every exported component's selector across the repo, and those of the installed libraries its Angular files import. */
+export function buildAngularSelectorIndex(
+  compiler: AngularCompiler,
+  files: readonly PendingAngularFile[],
+  library?: AngularLibraryIndex,
+): SelectorIndex {
   const components: { selector: string; entry: SelectorEntry }[] = [];
+  for (const c of library?.components ?? []) {
+    components.push({
+      selector: c.selector,
+      entry: { source: { type: "package", specifier: c.specifier }, exportName: c.exportName, inputs: c.inputs, outputs: c.outputs },
+    });
+  }
   for (const file of files) {
     for (const c of file.components) {
       if (c.selector === undefined || !c.isExported) continue;
@@ -115,21 +126,24 @@ export function buildAngularSelectorIndex(compiler: AngularCompiler, files: read
       });
     }
   }
-  return createSelectorIndex(compiler, components);
+  return createSelectorIndex(compiler, components, (library?.directives ?? []).map((d) => d.selector));
 }
 
 /** NgModule scopes across the repo: what each module declares and what it makes available to modules that import it. */
 export type AngularModuleScopes = {
-  /** The module a non-standalone component is declared in, by class name. */
+  /** The repo module a non-standalone component is declared in, by class name. */
   declaringModule(className: string): AngularModuleDecl | undefined;
   /** Class names a module exports, following exported modules. */
   exportedBy(moduleName: string): ReadonlySet<string>;
   isModule(className: string): boolean;
 };
 
-export function buildModuleScopes(files: readonly PendingAngularFile[]): AngularModuleScopes {
-  const modules = new Map<string, AngularModuleDecl>();
+export function buildModuleScopes(files: readonly PendingAngularFile[], library?: AngularLibraryIndex): AngularModuleScopes {
+  const modules = new Map<string, Pick<AngularModuleDecl, "exports">>();
   const declaredIn = new Map<string, AngularModuleDecl>();
+  for (const m of library?.modules ?? []) {
+    modules.set(m.exportName, { exports: m.exports.map((e) => e.exportName) });
+  }
   for (const file of files) {
     for (const m of file.modules) {
       modules.set(m.className, m);
@@ -160,10 +174,13 @@ export function buildModuleScopes(files: readonly PendingAngularFile[]): Angular
  * component declared in an NgModule sees that module's declarations and the
  * exports of the modules it imports.
  */
-function templateScope(c: AngularComponentDecl, scopes: AngularModuleScopes): ReadonlySet<string> | null {
+function templateScope(c: AngularComponentDecl, scopes: AngularModuleScopes, fileImports: readonly AngularImport[]): ReadonlySet<string> | null {
   const visible = new Set<string>();
+  // `imports: [...]` lists local names; components and modules are known by the name they're exported under.
+  const importedName = (local: string) => fileImports.find((i) => i.local === local)?.imported ?? local;
   const addImports = (imports: readonly string[]) => {
-    for (const name of imports) {
+    for (const local of imports) {
+      const name = importedName(local);
       if (scopes.isModule(name)) for (const e of scopes.exportedBy(name)) visible.add(e);
       else visible.add(name);
     }
@@ -258,7 +275,7 @@ export function emitAngularFile(opts: {
       builder = opts.templateBuilders.get(template.graphKey) ?? opts.graphBuilder.beginFile(template.graphKey, "angular");
       opts.templateBuilders.set(template.graphKey, builder);
     }
-    const scope = templateScope(c, opts.scopes);
+    const scope = templateScope(c, opts.scopes, file.imports);
     emitAngularTemplate({
       compiler,
       template: template.source,
@@ -270,6 +287,12 @@ export function emitAngularFile(opts: {
       inScope: (entry) => scope === null || scope.has(entry.exportName),
       resolveLocal,
       onTemplateError: (message) => opts.onTemplateError(template.graphKey, message),
+      // A class several entry points re-export: the entry this file imports from, else the first by name.
+      chooseEntry: (group) => {
+        const imported = new Set(file.imports.map((i) => i.specifier));
+        const sorted = [...group].sort((a, b) => entryLabel(a.entry).localeCompare(entryLabel(b.entry)));
+        return sorted.find((m) => m.entry.source.type === "package" && imported.has(m.entry.source.specifier)) ?? (sorted[0] as ElementMatch);
+      },
       onAmbiguous: (tagName, loc, matches: readonly ElementMatch[]) =>
         opts.onAmbiguous({ filePath: template.graphKey, line: loc.line, column: loc.column, tagName, candidates: matches.map((m) => entryLabel(m.entry)) }),
     });
