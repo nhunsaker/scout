@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { parseSync } from "oxc-parser";
 import type { AngularCompiler } from "@scoutui/parser-angular";
 import { buildAngularSelectorIndex, buildModuleScopes, importsOf, type PendingAngularFile } from "../../src/emit-angular-file.js";
-import { detectAngularComponents, detectAngularModules } from "../../src/local-index/detect-angular.js";
+import { detectAngularComponents, detectAngularDirectives, detectAngularModules } from "../../src/local-index/detect-angular.js";
 
 /** A `PendingAngularFile` built from real detector output, same shape scan.ts assembles. */
 function pendingFile(graphKey: string, source: string): PendingAngularFile {
@@ -14,6 +14,7 @@ function pendingFile(graphKey: string, source: string): PendingAngularFile {
     absPath: `/repo/${graphKey}`,
     components: detectAngularComponents(program, source),
     modules: detectAngularModules(program, source),
+    directives: detectAngularDirectives(program),
     imports: importsOf(program),
   };
 }

@@ -23,7 +23,7 @@ import {
   loadAngularCompiler,
   type PendingAngularFile,
 } from "../emit-angular-file.js";
-import { detectAngularBootstrap, detectAngularComponents, detectAngularModules } from "../local-index/detect-angular.js";
+import { detectAngularBootstrap, detectAngularComponents, detectAngularDirectives, detectAngularModules } from "../local-index/detect-angular.js";
 import { buildAngularLibraryIndex } from "../scan/angular-library-index.js";
 import { createProgress, startPhase } from "../util/progress.js";
 import { DEFAULT_INCLUDE, excludeEntriesMatchingNothing, nestedRepositoriesMatched, walkFiles, type WalkOptions } from "../walker/files.js";
@@ -545,14 +545,18 @@ export async function scanRepository(input: {
     }
     filesScanned++;
     const angular =
-      parsed.kind === "babel" && /@(Component|NgModule)\s*\(/.test(source) && importsAngularCore(parsed.ast)
-        ? { components: detectAngularComponents(parsed.ast, source), modules: detectAngularModules(parsed.ast, source) }
+      parsed.kind === "babel" && /@(Component|NgModule|Directive)\s*\(/.test(source) && importsAngularCore(parsed.ast)
+        ? {
+            components: detectAngularComponents(parsed.ast, source),
+            modules: detectAngularModules(parsed.ast, source),
+            directives: detectAngularDirectives(parsed.ast),
+          }
         : undefined;
     if (parsed.kind === "babel" && /\b(bootstrapApplication|bootstrapModule)\s*\(/.test(source)) {
       const imports = importsOf(parsed.ast);
       for (const call of detectAngularBootstrap(parsed.ast)) angularBootstraps.push({ graphKey: relPath, ...call, imports });
     }
-    if (parsed.kind === "babel" && angular !== undefined && (angular.components.length > 0 || angular.modules.length > 0)) {
+    if (parsed.kind === "babel" && angular !== undefined && (angular.components.length > 0 || angular.modules.length > 0 || angular.directives.length > 0)) {
       pendingAngular.push({ graphKey: relPath, definitionPath: outRel, absPath: file, ...angular, imports: importsOf(parsed.ast) });
     } else if (parsed.kind === "babel") {
       declaredByFile.set(outRel, extractReactDeclaredProps(parsed.ast));

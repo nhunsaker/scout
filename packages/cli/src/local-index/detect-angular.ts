@@ -63,7 +63,7 @@ export type AngularComponentDecl = {
  * Only classes decorated with a `Component(...)` call (bare identifier or
  * `x.Component` member — not required to come from @angular/core) are
  * returned; `@Directive`/`@Pipe`/`@NgModule` classes are skipped because
- * they never match that decorator name.
+ * they never match that decorator name (see `detectAngularDirectives`).
  */
 export function detectAngularComponents(program: Program, source: string): AngularComponentDecl[] {
   const out: AngularComponentDecl[] = [];
@@ -72,6 +72,43 @@ export function detectAngularComponents(program: Program, source: string): Angul
     if (decl) out.push(decl);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// @Directive({...}) classes
+// ---------------------------------------------------------------------------
+
+export type AngularDirectiveDecl = {
+  className: string;
+  /** The selector as written, e.g. `"hlm-field, [hlmField]"`. */
+  selector: string;
+};
+
+/**
+ * Detect `@Directive({ selector: "..." })` classes, same top-level shapes as
+ * `detectAngularComponents`. A directive renders nothing of its own and is
+ * never counted as a component; its selector only tells the scan which
+ * elements Angular itself owns. One whose selector isn't a string literal
+ * (or is missing) is skipped.
+ */
+export function detectAngularDirectives(program: Program): AngularDirectiveDecl[] {
+  const out: AngularDirectiveDecl[] = [];
+  for (const site of collectClassSites(program)) {
+    const call = findDecoratorCall(site.node.decorators, "Directive");
+    if (!call) continue;
+    const selector = readStringProperty(firstObjectArg(call), "selector");
+    if (selector !== undefined) out.push({ className: site.node.id?.name ?? "", selector });
+  }
+  return out;
+}
+
+function readStringProperty(obj: ObjectExpression | undefined, key: string): string | undefined {
+  for (const p of obj?.properties ?? []) {
+    if (p.type !== "Property" || p.key.type !== "Identifier" || p.key.name !== key) continue;
+    const v = readLiteralValue(p.value);
+    if (typeof v === "string") return v;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

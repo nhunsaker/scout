@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseSync } from "oxc-parser";
 import {
   detectAngularComponents,
+  detectAngularDirectives,
   detectAngularModules,
   detectAngularBootstrap,
   type AngularComponentDecl,
@@ -356,5 +357,19 @@ someObject.notBootstrapModule(AppModule);
 export class Foo {}
 `);
     expect(refs).toEqual([]);
+  });
+});
+
+describe("detectAngularDirectives", () => {
+  const detectDirectives = (source: string) => detectAngularDirectives(parseSync("t.ts", source).program);
+
+  it.each([
+    ["an exported directive", `@Directive({ selector: "ex-field, [exField]" })\nexport class ExField {}`, [{ className: "ExField", selector: "ex-field, [exField]" }]],
+    ["an unexported directive", `@Directive({ selector: "[exLabel]" })\nclass ExLabel {}`, [{ className: "ExLabel", selector: "[exLabel]" }]],
+    ["a directive with a non-literal selector", "@Directive({ selector: SELECTOR })\nexport class Dynamic {}", []],
+    ["a directive with no selector", "@Directive({})\nexport class Abstract {}", []],
+    ["a component", `@Component({ selector: "app-x", template: "" })\nexport class X {}`, []],
+  ])("reads %s", (_, body, expected) => {
+    expect(detectDirectives(`import { Directive, Component } from "@angular/core";\n${body}`)).toEqual(expected);
   });
 });

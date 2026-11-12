@@ -262,6 +262,16 @@ describe.each(VERSIONS)("integration: angular-app fixture (Angular %d)", (ngVers
     });
   });
 
+  describe("local-directive", () => {
+    const S = "local-directive";
+    const page = local(S, "local-directive-page.component.ts", "LocalDirectivePageComponent");
+
+    // The repo's own `@Directive` with an element selector claims `<ex-field>`; `<x-widget>` is no directive's, so it stays a tag usage.
+    it("reports no tag usage for an element a directive declared in the repo selects, and one for an unclaimed hyphenated tag", () => {
+      expect(rendersIn(S)).toEqual([row("local-directive-page.component.ts:7:35", tag("x-widget"), page, [])]);
+    });
+  });
+
   describe("selector-conflict", () => {
     const S = "selector-conflict";
 
@@ -451,6 +461,7 @@ describe.each(VERSIONS)("integration: angular-app fixture (Angular %d)", (ngVers
           "src/imports-spread/imports-spread-page.component.ts",
           "src/imports-spread/spread-button.component.ts",
           "src/inline-template/card.component.ts",
+          "src/local-directive/local-directive-page.component.ts",
           "src/inline-template/tag.component.ts",
           "src/monorepo-modules/app-one/app-root.component.ts",
           "src/monorepo-modules/app-one/header.component.ts",

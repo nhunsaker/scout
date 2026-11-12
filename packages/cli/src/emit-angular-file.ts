@@ -12,7 +12,7 @@ import {
   type SelectorIndex,
 } from "@scoutui/parser-angular";
 import type { DeclaredPropApi } from "@scoutui/scan-format";
-import type { AngularComponentDecl, AngularModuleDecl } from "./local-index/detect-angular.js";
+import type { AngularComponentDecl, AngularDirectiveDecl, AngularModuleDecl } from "./local-index/detect-angular.js";
 import type { AngularLibraryIndex } from "./scan/angular-library-index.js";
 import type { LocalDefinition } from "./local-index/types.js";
 import { errorMessage } from "./util/errors.js";
@@ -29,6 +29,8 @@ export type PendingAngularFile = {
   absPath: string;
   components: AngularComponentDecl[];
   modules: AngularModuleDecl[];
+  /** The file's `@Directive` classes: never counted, but their element selectors are not custom elements. */
+  directives: AngularDirectiveDecl[];
   imports: AngularImport[];
 };
 
@@ -180,7 +182,9 @@ export function buildAngularSelectorIndex(
       });
     }
   }
-  return createSelectorIndex(compiler, components, (library?.directives ?? []).map((d) => d.selector));
+  // Directives, library and repo alike, are matched by selector everywhere: an element one claims is Angular's own, not a custom element.
+  const directiveSelectors = [...(library?.directives ?? []).map((d) => d.selector), ...files.flatMap((f) => f.directives.map((d) => d.selector))];
+  return createSelectorIndex(compiler, components, directiveSelectors);
 }
 
 /**

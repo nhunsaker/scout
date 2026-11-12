@@ -720,6 +720,40 @@
       }
     },
     {
+      "id": "68e97b299cf91e9f",
+      "identity": {
+        "kind": "repository-declaration",
+        "repoId": "angular-app",
+        "filePath": "src/local-directive/local-directive-page.component.ts",
+        "exportName": "LocalDirectivePageComponent"
+      },
+      "framework": "angular",
+      "stats": {
+        "occurrenceCount": 0,
+        "fileCount": 0
+      },
+      "usage": "none",
+      "props": {},
+      "declared": {
+        "props": {},
+        "hasRest": false
+      },
+      "definition": {
+        "line": 9,
+        "column": 8
+      },
+      "owningPackage": "angular-app",
+      "version": null,
+      "composition": {
+        "rendersByCount": {
+          "92b4898ffa0a169b": 1
+        },
+        "renderedByCount": {},
+        "isRootCount": 0,
+        "isLeafCount": 0
+      }
+    },
+    {
       "id": "3aca91295feb9b15",
       "identity": {
         "kind": "repository-declaration",
@@ -1386,8 +1420,8 @@
         "evidence": []
       },
       "stats": {
-        "occurrenceCount": 1,
-        "fileCount": 1
+        "occurrenceCount": 2,
+        "fileCount": 2
       },
       "usage": "direct",
       "props": {},
@@ -1395,10 +1429,11 @@
       "composition": {
         "rendersByCount": {},
         "renderedByCount": {
+          "68e97b299cf91e9f": 1,
           "5befec9c81450b99": 1
         },
         "isRootCount": 0,
-        "isLeafCount": 1
+        "isLeafCount": 2
       }
     }
   ],
@@ -1697,6 +1732,22 @@
         }
       },
       "ownerComponentId": "4da1c363872c317d"
+    },
+    {
+      "occurrenceId": "2f422eb8d042b0fd",
+      "resolution": {
+        "status": "resolved",
+        "componentId": "92b4898ffa0a169b"
+      },
+      "filePath": "src/local-directive/local-directive-page.component.ts",
+      "line": 7,
+      "column": 35,
+      "credit": {
+        "kind": "render"
+      },
+      "trace": [],
+      "props": {},
+      "ownerComponentId": "68e97b299cf91e9f"
     },
     {
       "occurrenceId": "73824564c2fe5dc0",
